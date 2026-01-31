@@ -136,7 +136,7 @@ module ClickhouseRuby
           @available << connection
         else
           # Disconnect unhealthy connections
-          connection.disconnect rescue nil
+          safe_disconnect(connection)
           @all_connections.delete(connection)
         end
 
@@ -182,7 +182,7 @@ module ClickhouseRuby
     def shutdown
       @mutex.synchronize do
         (@available + @in_use).each do |conn|
-          conn.disconnect rescue nil
+          safe_disconnect(conn)
         end
 
         @available.clear
@@ -201,7 +201,7 @@ module ClickhouseRuby
       @mutex.synchronize do
         @available.reject! do |conn|
           if conn.stale?(max_idle_seconds) || !conn.healthy?
-            conn.disconnect rescue nil
+            safe_disconnect(conn)
             @all_connections.delete(conn)
             removed += 1
             true
@@ -279,12 +279,22 @@ module ClickhouseRuby
           return conn
         else
           # Remove unhealthy connections
-          conn.disconnect rescue nil
+          safe_disconnect(conn)
           @all_connections.delete(conn)
         end
       end
 
       nil
+    end
+
+    # Safely disconnects a connection, logging any errors
+    #
+    # @param connection [Connection] the connection to disconnect
+    # @return [void]
+    def safe_disconnect(connection)
+      connection.disconnect
+    rescue StandardError => e
+      @config.logger&.warn("[ClickhouseRuby] Disconnect error: #{e.class} - #{e.message}")
     end
 
     # Creates a new connection

@@ -179,7 +179,9 @@ module ClickhouseRuby
     # @return [Boolean] true if server responds to ping
     def ping
       @pool.with_connection(&:ping)
-    rescue StandardError
+    rescue ClickhouseRuby::ConnectionError, ClickhouseRuby::ConnectionTimeout,
+           ClickhouseRuby::PoolTimeout, Errno::ECONNREFUSED, Errno::EHOSTUNREACH,
+           SocketError, Net::OpenTimeout, Net::ReadTimeout
       false
     end
 

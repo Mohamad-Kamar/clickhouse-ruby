@@ -40,6 +40,7 @@ module ClickhouseRuby
       #
       # @param value [Object] the value from ClickHouse
       # @return [Float, nil] the float value
+      # @raise [TypeCastError] if the value cannot be converted
       def deserialize(value)
         return nil if value.nil?
 
@@ -48,8 +49,15 @@ module ClickhouseRuby
           value
         when ::String
           parse_string(value)
-        else
+        when ::Integer, ::BigDecimal, ::Rational
           value.to_f
+        else
+          raise TypeCastError.new(
+            "Cannot deserialize #{value.class} to #{name}",
+            from_type: value.class.name,
+            to_type: name,
+            value: value
+          )
         end
       end
 

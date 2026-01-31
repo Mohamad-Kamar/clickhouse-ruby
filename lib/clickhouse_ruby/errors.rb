@@ -140,5 +140,17 @@ module ClickhouseRuby
     def error_class_for_code(code)
       ERROR_CODE_MAPPING.fetch(code, QueryError)
     end
+
+    # Sanitizes a message to prevent credential leakage
+    #
+    # @param message [String] the message to sanitize
+    # @param config [Configuration, nil] the configuration containing credentials
+    # @return [String] the sanitized message
+    def sanitize_message(message, config)
+      return message unless config&.respond_to?(:password) && config.password
+      return message if config.password.to_s.empty?
+
+      message.gsub(config.password.to_s, '[REDACTED]')
+    end
   end
 end

@@ -272,6 +272,7 @@ module ClickhouseRuby
         else
           # Only disable if explicitly requested (development only!)
           http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+          warn '[ClickhouseRuby] WARNING: SSL verification disabled. Insecure for production.'
         end
 
         # Use modern TLS versions

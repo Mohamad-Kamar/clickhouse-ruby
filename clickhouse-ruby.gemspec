@@ -11,13 +11,13 @@ Gem::Specification.new do |spec|
   spec.summary = "Ruby/ActiveRecord integration for ClickHouse"
   spec.description = "A lightweight Ruby client for ClickHouse with optional ActiveRecord integration. " \
                      "Provides a simple interface for querying, inserting, and managing ClickHouse databases."
-  spec.homepage = "https://github.com/kamardev/clickhouse-ruby"
+  spec.homepage = "https://github.com/Mohamad-Kamar/clickhouse-ruby"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 2.6.0"
 
   spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["source_code_uri"] = "https://github.com/kamardev/clickhouse-ruby"
-  spec.metadata["changelog_uri"] = "https://github.com/kamardev/clickhouse-ruby/blob/main/CHANGELOG.md"
+  spec.metadata["source_code_uri"] = "https://github.com/Mohamad-Kamar/clickhouse-ruby"
+  spec.metadata["changelog_uri"] = "https://github.com/Mohamad-Kamar/clickhouse-ruby/blob/main/CHANGELOG.md"
   spec.metadata["documentation_uri"] = "https://rubydoc.info/gems/clickhouse-ruby"
   spec.metadata["rubygems_mfa_required"] = "true"
 

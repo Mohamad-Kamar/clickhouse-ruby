@@ -39,8 +39,9 @@ RSpec.describe 'Error Handling', :integration do
 
       it 'does NOT silently fail on DELETE errors with invalid syntax' do
         # This should raise an error, NOT return silently
+        # Use mutations_sync=1 to make mutation synchronous and catch errors immediately
         expect {
-          client.execute('ALTER TABLE test_delete_errors DELETE WHERE id IN (INVALID_SYNTAX)')
+          client.execute('ALTER TABLE test_delete_errors DELETE WHERE id IN (INVALID_SYNTAX)', settings: { mutations_sync: 1 })
         }.to raise_error(ClickhouseRuby::QueryError)
       end
 

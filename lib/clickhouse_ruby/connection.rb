@@ -322,6 +322,12 @@ module ClickhouseRuby
             "Connection lost: #{e.message}",
             original_error: e
           )
+        rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH, SocketError => e
+          @connected = false
+          raise ConnectionNotEstablished.new(
+            "Connection failed: #{e.message}",
+            original_error: e
+          )
         end
       end
     end

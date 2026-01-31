@@ -7,9 +7,11 @@ RSpec.describe ClickhouseRuby::Types::Registry do
 
   describe '#initialize' do
     it 'creates an empty registry' do
-      expect { registry.lookup('String') }.to raise_error(ClickhouseRuby::Types::Parser::ParseError).or(
-        satisfy { |r| r.is_a?(ClickhouseRuby::Types::Base) }
-      )
+      # An empty registry has no types registered, so lookup returns a Base type
+      # (the registry falls back to Base for unknown types)
+      result = registry.lookup('String')
+      expect(result).to be_a(ClickhouseRuby::Types::Base)
+      expect(result.name).to eq('String')
     end
   end
 

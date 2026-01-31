@@ -114,9 +114,13 @@ RSpec.describe ClickhouseRuby::ConnectionPool do
       end
     end
 
-    context 'when checking out unhealthy connection' do
+    context 'when checking out unhealthy connection from pool' do
       before do
-        allow(mock_connection).to receive(:healthy?).and_return(false, true)
+        # First, get a connection into the available pool
+        conn = pool.checkout
+        pool.checkin(conn)
+        # Now make it unhealthy for the next checkout
+        allow(mock_connection).to receive(:healthy?).and_return(false)
       end
 
       it 'disconnects unhealthy connection and creates new one' do
@@ -141,30 +145,28 @@ RSpec.describe ClickhouseRuby::ConnectionPool do
     end
 
     context 'when connection is unhealthy' do
-      before do
-        allow(mock_connection).to receive(:healthy?).and_return(true, false)
-      end
-
       it 'disconnects unhealthy connection' do
         conn = pool.checkout
+        # Make unhealthy after checkout, before checkin
+        allow(mock_connection).to receive(:healthy?).and_return(false)
         expect(mock_connection).to receive(:disconnect)
         pool.checkin(conn)
       end
 
       it 'does not return unhealthy connection to pool' do
         conn = pool.checkout
+        # Make unhealthy after checkout, before checkin
+        allow(mock_connection).to receive(:healthy?).and_return(false)
         pool.checkin(conn)
         expect(pool.available_count).to eq(0)
       end
     end
 
     context 'when connection is stale' do
-      before do
-        allow(mock_connection).to receive(:stale?).and_return(false, true)
-      end
-
       it 'disconnects stale connection' do
         conn = pool.checkout
+        # Make stale after checkout, before checkin
+        allow(mock_connection).to receive(:stale?).and_return(true)
         expect(mock_connection).to receive(:disconnect)
         pool.checkin(conn)
       end
@@ -175,13 +177,14 @@ RSpec.describe ClickhouseRuby::ConnectionPool do
 
       before do
         config.logger = logger
-        allow(mock_connection).to receive(:healthy?).and_return(true, false)
-        allow(mock_connection).to receive(:disconnect).and_raise(StandardError.new('disconnect failed'))
         allow(logger).to receive(:warn)
       end
 
       it 'logs the error instead of raising' do
         conn = pool.checkout
+        # Make unhealthy after checkout, then make disconnect fail
+        allow(mock_connection).to receive(:healthy?).and_return(false)
+        allow(mock_connection).to receive(:disconnect).and_raise(StandardError.new('disconnect failed'))
         expect(logger).to receive(:warn).with(/Disconnect error/)
         pool.checkin(conn)
       end
@@ -299,11 +302,9 @@ RSpec.describe ClickhouseRuby::ConnectionPool do
     end
 
     context 'when connections are stale' do
-      before do
-        allow(mock_connection).to receive(:stale?).and_return(false, true)
-      end
-
       it 'removes stale connections' do
+        # Make stale before cleanup
+        allow(mock_connection).to receive(:stale?).and_return(true)
         removed = pool.cleanup
         expect(removed).to eq(1)
         expect(pool.available_count).to eq(0)
@@ -311,11 +312,9 @@ RSpec.describe ClickhouseRuby::ConnectionPool do
     end
 
     context 'when connections are unhealthy' do
-      before do
-        allow(mock_connection).to receive(:healthy?).and_return(true, false)
-      end
-
       it 'removes unhealthy connections' do
+        # Make unhealthy before cleanup
+        allow(mock_connection).to receive(:healthy?).and_return(false)
         removed = pool.cleanup
         expect(removed).to eq(1)
         expect(pool.available_count).to eq(0)
@@ -327,12 +326,13 @@ RSpec.describe ClickhouseRuby::ConnectionPool do
 
       before do
         config.logger = logger
-        allow(mock_connection).to receive(:stale?).and_return(true)
-        allow(mock_connection).to receive(:disconnect).and_raise(StandardError.new('cleanup error'))
         allow(logger).to receive(:warn)
       end
 
       it 'logs the error and continues' do
+        # Make stale and make disconnect fail
+        allow(mock_connection).to receive(:stale?).and_return(true)
+        allow(mock_connection).to receive(:disconnect).and_raise(StandardError.new('cleanup error'))
         expect(logger).to receive(:warn).with(/Disconnect error/)
         pool.cleanup
       end

@@ -61,7 +61,15 @@ module ClickhouseRuby
       def serialize(value)
         return 'NULL' if value.nil?
 
-        value ? '1' : '0'
+        # Check explicit FALSE_VALUES first since Ruby's 0 is truthy
+        if FALSE_VALUES.include?(value)
+          '0'
+        elsif TRUE_VALUES.include?(value)
+          '1'
+        else
+          # Default to truthy evaluation for other values
+          value ? '1' : '0'
+        end
       end
     end
   end

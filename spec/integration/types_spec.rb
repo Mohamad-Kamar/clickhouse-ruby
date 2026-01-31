@@ -239,13 +239,15 @@ RSpec.describe 'Type System Integration', :integration do
   end
 
   describe 'nullable types' do
+    # Note: ClickHouse does not allow Nullable(Array(...)) - arrays cannot be nullable.
+    # Use Array(Nullable(...)) if you need nullable elements inside an array.
     before do
       client.execute(<<~SQL)
         CREATE TABLE IF NOT EXISTS test_nullable_integration (
           id UInt64,
           nullable_int Nullable(Int32),
           nullable_string Nullable(String),
-          nullable_array Nullable(Array(Int32))
+          nullable_elements Array(Nullable(Int32))
         ) ENGINE = MergeTree() ORDER BY id
       SQL
     end
@@ -259,13 +261,13 @@ RSpec.describe 'Type System Integration', :integration do
         id: 1,
         nullable_int: nil,
         nullable_string: nil,
-        nullable_array: nil
+        nullable_elements: []
       }])
 
       result = client.execute('SELECT * FROM test_nullable_integration WHERE id = 1').first
       expect(result['nullable_int']).to be_nil
       expect(result['nullable_string']).to be_nil
-      expect(result['nullable_array']).to be_nil
+      expect(result['nullable_elements']).to eq([])
     end
 
     it 'correctly handles non-null values in nullable columns' do
@@ -273,13 +275,13 @@ RSpec.describe 'Type System Integration', :integration do
         id: 2,
         nullable_int: 42,
         nullable_string: 'hello',
-        nullable_array: [1, 2, 3]
+        nullable_elements: [1, nil, 3]  # Array with nullable elements
       }])
 
       result = client.execute('SELECT * FROM test_nullable_integration WHERE id = 2').first
       expect(result['nullable_int']).to eq(42)
       expect(result['nullable_string']).to eq('hello')
-      expect(result['nullable_array']).to eq([1, 2, 3])
+      expect(result['nullable_elements']).to eq([1, nil, 3])
     end
   end
 

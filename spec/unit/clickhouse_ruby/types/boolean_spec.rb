@@ -139,9 +139,12 @@ RSpec.describe ClickhouseRuby::Types::Boolean do
     end
 
     context 'from falsy values' do
-      it 'returns 0 for falsy values (except nil)' do
+      it 'returns 0 for values in FALSE_VALUES' do
         expect(type.serialize(0)).to eq('0')
-        expect(type.serialize('')).to eq('0')
+        expect(type.serialize('0')).to eq('0')
+        expect(type.serialize('false')).to eq('0')
+        expect(type.serialize('no')).to eq('0')
+        expect(type.serialize('off')).to eq('0')
       end
     end
   end

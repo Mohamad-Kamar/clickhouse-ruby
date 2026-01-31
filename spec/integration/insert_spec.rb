@@ -42,9 +42,9 @@ RSpec.describe 'Insert Operations', :integration do
       expect(result.first['cnt']).to eq(10)
     end
 
-    it 'handles empty insert' do
-      # Inserting empty array should not raise error
-      expect { client.insert('test_basic_insert', []) }.not_to raise_error
+    it 'raises ArgumentError for empty insert' do
+      # Inserting empty array should raise ArgumentError to prevent silent no-ops
+      expect { client.insert('test_basic_insert', []) }.to raise_error(ArgumentError, /rows cannot be empty/)
     end
   end
 

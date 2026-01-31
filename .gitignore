@@ -1,0 +1,52 @@
+# Bundler
+/.bundle/
+/vendor/bundle/
+Gemfile.lock
+
+# Gem build artifacts
+*.gem
+/pkg/
+
+# RSpec
+/.rspec_status
+
+# Coverage
+/coverage/
+
+# Documentation
+/doc/
+/.yardoc/
+
+# IDE / Editor
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+/tmp/
+*.tmp
+*.temp
+
+# Log files
+*.log
+
+# VCR cassettes (if not committed)
+# spec/vcr_cassettes/
+
+# Debug
+.byebug_history
+.irb_history
+
+# Docker volumes
+docker/data/

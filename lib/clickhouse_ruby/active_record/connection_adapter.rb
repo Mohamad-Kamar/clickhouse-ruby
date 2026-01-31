@@ -73,9 +73,9 @@ module ClickhouseRuby
         # @param config [Hash] database configuration
         # @return [ConnectionAdapter] the adapter instance
         def new_client(config)
-          chruby_config = build_chruby_config(config)
-          chruby_config.validate!
-          ClickhouseRuby::Client.new(chruby_config)
+          clickhouse_config = build_clickhouse_config(config)
+          clickhouse_config.validate!
+          ClickhouseRuby::Client.new(clickhouse_config)
         end
 
         private
@@ -84,7 +84,7 @@ module ClickhouseRuby
         #
         # @param config [Hash] database configuration hash
         # @return [ClickhouseRuby::Configuration] configured client
-        def build_chruby_config(config)
+        def build_clickhouse_config(config)
           ClickhouseRuby::Configuration.new.tap do |c|
             c.host = config[:host] || 'localhost'
             c.port = config[:port]&.to_i || 8123
@@ -112,7 +112,7 @@ module ClickhouseRuby
       # @param config [Hash] database configuration
       def initialize(connection, logger = nil, connection_options = nil, config = {})
         @config = config.symbolize_keys
-        @chruby_client = nil
+        @clickhouse_client = nil
         @connection_parameters = nil
 
         super(connection, logger, config)
@@ -140,7 +140,7 @@ module ClickhouseRuby
       #
       # @return [Boolean] true if connected and responding
       def active?
-        return false unless @chruby_client
+        return false unless @clickhouse_client
 
         # Ping ClickHouse to verify connection
         execute_internal('SELECT 1')
@@ -153,7 +153,7 @@ module ClickhouseRuby
       #
       # @return [Boolean] true if we have a client instance
       def connected?
-        !@chruby_client.nil?
+        !@clickhouse_client.nil?
       end
 
       # Disconnect from the database
@@ -161,8 +161,8 @@ module ClickhouseRuby
       # @return [void]
       def disconnect!
         super
-        @chruby_client&.close if @chruby_client.respond_to?(:close)
-        @chruby_client = nil
+        @clickhouse_client&.close if @clickhouse_client.respond_to?(:close)
+        @clickhouse_client = nil
       end
 
       # Reconnect to the database
@@ -185,7 +185,7 @@ module ClickhouseRuby
       #
       # @return [void]
       def connect
-        @chruby_client = self.class.new_client(@config)
+        @clickhouse_client = self.class.new_client(@config)
       end
 
       # ========================================
@@ -573,7 +573,7 @@ module ClickhouseRuby
       def ensure_connected!
         connect unless connected?
 
-        unless @chruby_client
+        unless @clickhouse_client
           raise ClickhouseRuby::ConnectionNotEstablished,
                 'No connection to ClickHouse. Call connect first.'
         end
@@ -584,7 +584,7 @@ module ClickhouseRuby
       # @param sql [String] the SQL to execute
       # @return [ClickhouseRuby::Result] the result
       def execute_internal(sql)
-        @chruby_client.execute(sql)
+        @clickhouse_client.execute(sql)
       end
 
       # Check if result contains an error and raise it
@@ -718,6 +718,6 @@ if defined?(::ActiveRecord::ConnectionAdapters)
   ::ActiveRecord::ConnectionAdapters.register(
     'clickhouse',
     'ClickhouseRuby::ActiveRecord::ConnectionAdapter',
-    'chruby/active_record/connection_adapter'
+    'clickhouse_ruby/active_record/connection_adapter'
   )
 end

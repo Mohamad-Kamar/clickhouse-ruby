@@ -28,7 +28,7 @@ module ClickhouseRuby
     #
     class Railtie < ::Rails::Railtie
       # Initialize the adapter when ActiveRecord loads
-      initializer 'chruby.initialize_active_record' do
+      initializer 'clickhouse_ruby.initialize_active_record' do
         # Register the adapter
         ::ActiveSupport.on_load(:active_record) do
           require_relative 'connection_adapter'
@@ -41,7 +41,7 @@ module ClickhouseRuby
       end
 
       # Configure database tasks (db:create, db:drop, etc.)
-      initializer 'chruby.configure_database_tasks' do
+      initializer 'clickhouse_ruby.configure_database_tasks' do
         ::ActiveSupport.on_load(:active_record) do
           # Register ClickHouse-specific database tasks
           if defined?(::ActiveRecord::Tasks::DatabaseTasks)
@@ -65,7 +65,7 @@ module ClickhouseRuby
       end
 
       # Log deprecation warnings for known issues
-      initializer 'chruby.log_deprecation_warnings' do
+      initializer 'clickhouse_ruby.log_deprecation_warnings' do
         ::ActiveSupport.on_load(:active_record) do
           # Warn about features that don't work with ClickHouse
           if defined?(Rails.logger) && Rails.logger

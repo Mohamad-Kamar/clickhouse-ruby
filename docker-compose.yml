@@ -3,7 +3,7 @@ version: "3.8"
 services:
   clickhouse:
     image: clickhouse/clickhouse-server:24.1
-    container_name: chruby-clickhouse
+    container_name: clickhouse-ruby-clickhouse
     ports:
       - "8123:8123"   # HTTP interface
       - "9000:9000"   # Native interface

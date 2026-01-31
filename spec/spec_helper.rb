@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'logger'
 require 'simplecov'
 
 SimpleCov.start do
@@ -18,7 +19,8 @@ require 'bundler/setup'
 require 'clickhouse_ruby'
 require 'webmock/rspec'
 
-# Allow localhost connections for integration tests
+# Allow localhost connections for unit tests
+# Integration tests will disable WebMock completely
 WebMock.disable_net_connect!(allow_localhost: true)
 
 # Load support files
@@ -51,6 +53,8 @@ RSpec.configure do |config|
   # Integration test setup
   config.before(:suite) do
     if ENV['CLICKHOUSE_TEST_INTEGRATION']
+      # Disable WebMock for integration tests - they need real HTTP
+      WebMock.allow_net_connect!
       ClickhouseHelper.setup_test_database
     end
   end

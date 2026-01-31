@@ -84,6 +84,7 @@ module ClickhouseRuby
       # - Type names: String, UInt64
       # - Numeric literals: 3 (precision), 9 (scale)
       # - String literals: 'UTC' (timezone)
+      # - Enum entries: 'active' = 1 (for Enum8/Enum16)
       #
       # @return [Hash] the parsed type/value
       def parse_type
@@ -95,9 +96,22 @@ module ClickhouseRuby
           return { type: value }
         end
 
-        # Handle string literals (e.g., DateTime64(3, 'UTC'))
+        # Handle string literals (e.g., DateTime64(3, 'UTC') or Enum8('active' = 1))
         if peek == "'"
           value = parse_string_literal
+          skip_whitespace
+          # Handle Enum value assignment: 'name' = value (or 'name' = -1)
+          if peek == '='
+            consume('=')
+            skip_whitespace
+            # Skip optional negative sign
+            if peek == '-'
+              @pos += 1
+              skip_whitespace
+            end
+            # Skip the numeric value
+            parse_numeric if numeric_char?(peek)
+          end
           return { type: value }
         end
 

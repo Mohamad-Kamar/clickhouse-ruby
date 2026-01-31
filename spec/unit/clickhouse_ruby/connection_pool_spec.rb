@@ -327,7 +327,7 @@ RSpec.describe ClickhouseRuby::ConnectionPool do
 
       before do
         config.logger = logger
-        allow(mock_connection).to receive(:stale?).and_return(false, true)
+        allow(mock_connection).to receive(:stale?).and_return(true)
         allow(mock_connection).to receive(:disconnect).and_raise(StandardError.new('cleanup error'))
         allow(logger).to receive(:warn)
       end

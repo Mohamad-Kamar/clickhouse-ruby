@@ -8,7 +8,7 @@
 # - Truncating tables between tests
 #
 module ClickhouseHelper
-  TEST_DATABASE = 'chruby_test'
+  TEST_DATABASE = 'clickhouse_ruby_test'
 
   class << self
     # Returns a configured client for testing

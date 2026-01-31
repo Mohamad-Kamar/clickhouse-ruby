@@ -180,8 +180,8 @@ module ClickhouseRuby
     def ping
       @pool.with_connection(&:ping)
     rescue ClickhouseRuby::ConnectionError, ClickhouseRuby::ConnectionTimeout,
-           ClickhouseRuby::PoolTimeout, Errno::ECONNREFUSED, Errno::EHOSTUNREACH,
-           SocketError, Net::OpenTimeout, Net::ReadTimeout
+           ClickhouseRuby::PoolTimeout, SystemCallError, SocketError,
+           Net::OpenTimeout, Net::ReadTimeout
       false
     end
 

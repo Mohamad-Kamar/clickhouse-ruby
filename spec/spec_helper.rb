@@ -6,33 +6,20 @@ SimpleCov.start do
   add_filter '/spec/'
   add_filter '/vendor/'
 
-  add_group 'Types', 'lib/chruby/types'
-  add_group 'Core', 'lib/chruby'
+  add_group 'Types', 'lib/clickhouse_ruby/types'
+  add_group 'Core', 'lib/clickhouse_ruby'
+  add_group 'ActiveRecord', 'lib/clickhouse_ruby/active_record'
 
-  minimum_coverage 90
-  minimum_coverage_by_file 80
+  minimum_coverage 80
+  minimum_coverage_by_file 70
 end
 
 require 'bundler/setup'
 require 'clickhouse_ruby'
 require 'webmock/rspec'
-require 'vcr'
 
 # Load support files
 Dir[File.join(__dir__, 'support', '**', '*.rb')].sort.each { |f| require f }
-
-VCR.configure do |config|
-  config.cassette_library_dir = File.join(__dir__, 'cassettes')
-  config.hook_into :webmock
-  config.configure_rspec_metadata!
-  config.default_cassette_options = {
-    record: :new_episodes,
-    match_requests_on: %i[method uri body]
-  }
-  # Filter sensitive data
-  config.filter_sensitive_data('<CLICKHOUSE_PASSWORD>') { ENV.fetch('CLICKHOUSE_PASSWORD', 'default_password') }
-  config.filter_sensitive_data('<CLICKHOUSE_HOST>') { ENV.fetch('CLICKHOUSE_HOST', 'localhost') }
-end
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

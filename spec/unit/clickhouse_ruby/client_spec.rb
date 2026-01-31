@@ -237,6 +237,16 @@ RSpec.describe ClickhouseRuby::Client do
       end
     end
 
+    context 'when PoolTimeout occurs' do
+      before do
+        allow(mock_pool).to receive(:with_connection).and_raise(ClickhouseRuby::PoolTimeout.new('Pool exhausted'))
+      end
+
+      it 'returns false' do
+        expect(client.ping).to be false
+      end
+    end
+
     context 'when Errno::ECONNREFUSED occurs' do
       before do
         allow(mock_pool).to receive(:with_connection).and_raise(Errno::ECONNREFUSED)
@@ -247,9 +257,59 @@ RSpec.describe ClickhouseRuby::Client do
       end
     end
 
+    context 'when Errno::ENETUNREACH occurs' do
+      before do
+        allow(mock_pool).to receive(:with_connection).and_raise(Errno::ENETUNREACH)
+      end
+
+      it 'returns false' do
+        expect(client.ping).to be false
+      end
+    end
+
+    context 'when Errno::ETIMEDOUT occurs' do
+      before do
+        allow(mock_pool).to receive(:with_connection).and_raise(Errno::ETIMEDOUT)
+      end
+
+      it 'returns false' do
+        expect(client.ping).to be false
+      end
+    end
+
+    context 'when Errno::ENETDOWN occurs' do
+      before do
+        allow(mock_pool).to receive(:with_connection).and_raise(Errno::ENETDOWN)
+      end
+
+      it 'returns false' do
+        expect(client.ping).to be false
+      end
+    end
+
+    context 'when SocketError occurs' do
+      before do
+        allow(mock_pool).to receive(:with_connection).and_raise(SocketError.new('getaddrinfo: Name or service not known'))
+      end
+
+      it 'returns false' do
+        expect(client.ping).to be false
+      end
+    end
+
     context 'when Net::OpenTimeout occurs' do
       before do
         allow(mock_pool).to receive(:with_connection).and_raise(Net::OpenTimeout)
+      end
+
+      it 'returns false' do
+        expect(client.ping).to be false
+      end
+    end
+
+    context 'when Net::ReadTimeout occurs' do
+      before do
+        allow(mock_pool).to receive(:with_connection).and_raise(Net::ReadTimeout)
       end
 
       it 'returns false' do

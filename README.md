@@ -1,6 +1,19 @@
 # ClickhouseRuby
 
+[![Tests](https://github.com/Mohamad-Kamar/clickhouse-ruby/actions/workflows/test.yml/badge.svg)](https://github.com/Mohamad-Kamar/clickhouse-ruby/actions/workflows/test.yml)
+[![Gem Version](https://badge.fury.io/rb/clickhouse-ruby.svg)](https://badge.fury.io/rb/clickhouse-ruby)
+[![Downloads](https://img.shields.io/gem/dt/clickhouse-ruby.svg)](https://rubygems.org/gems/clickhouse-ruby)
+
 A lightweight Ruby client for ClickHouse with optional ActiveRecord integration.
+
+## Features
+
+- **Simple HTTP client** - Clean API for queries, commands, and bulk inserts
+- **Connection pooling** - Built-in connection pool with health checks
+- **Type system** - Full support for ClickHouse types including Nullable, Array, Map, Tuple
+- **Proper error handling** - Never silently ignores errors (fixes clickhouse-activerecord #230)
+- **SSL/TLS support** - Certificate verification enabled by default
+- **ActiveRecord integration** - Optional familiar model-based access
 
 ## Installation
 
@@ -25,17 +38,19 @@ gem install clickhouse-ruby
 ## Quick Start
 
 ```ruby
-require 'clickhouse-ruby'
+require 'clickhouse_ruby'
+
+# Configure the client
+config = ClickhouseRuby::Configuration.new
+config.host = 'localhost'
+config.port = 8123
+config.database = 'default'
 
 # Create a client
-client = ClickhouseRuby::Client.new(
-  host: 'localhost',
-  port: 8123,
-  database: 'default'
-)
+client = ClickhouseRuby::Client.new(config)
 
 # Execute a query
-result = client.query('SELECT 1 + 1 AS result')
+result = client.execute('SELECT 1 + 1 AS result')
 puts result.first['result'] # => 2
 
 # Insert data
@@ -57,7 +72,8 @@ ClickhouseRuby.configure do |config|
   config.username = 'default'
   config.password = ''
   config.ssl = false
-  config.timeout = 60
+  config.connect_timeout = 10
+  config.read_timeout = 60
 end
 
 # Use the default client
@@ -72,10 +88,13 @@ client = ClickhouseRuby.client
 | `port` | HTTP interface port | `8123` |
 | `database` | Default database | `default` |
 | `username` | Authentication username | `default` |
-| `password` | Authentication password | `''` |
+| `password` | Authentication password | `nil` |
 | `ssl` | Enable HTTPS | `false` |
-| `timeout` | Request timeout in seconds | `60` |
-| `max_retries` | Number of retry attempts | `3` |
+| `ssl_verify` | Verify SSL certificates | `true` |
+| `connect_timeout` | Connection timeout in seconds | `10` |
+| `read_timeout` | Read timeout in seconds | `60` |
+| `write_timeout` | Write timeout in seconds | `60` |
+| `pool_size` | Connection pool size | `5` |
 
 ### Environment Variables
 
@@ -95,40 +114,26 @@ CLICKHOUSE_SSL=false
 ### Querying Data
 
 ```ruby
-# Simple query
-result = client.query('SELECT * FROM events LIMIT 10')
+# Simple query - returns Result object
+result = client.execute('SELECT * FROM events LIMIT 10')
+result.each { |row| puts row['event_type'] }
 
-# Query with parameters (prevents SQL injection)
-result = client.query(
-  'SELECT * FROM events WHERE date = {date:Date}',
-  params: { date: '2024-01-01' }
+# Access columns and types
+result.columns  # => ['id', 'event_type', 'count']
+result.types    # => ['UInt64', 'String', 'UInt32']
+
+# Query with settings
+result = client.execute(
+  'SELECT * FROM events',
+  settings: { max_rows_to_read: 1_000_000 }
 )
-
-# Query with specific format
-result = client.query('SELECT * FROM events', format: 'JSONEachRow')
 ```
 
-### Inserting Data
-
-```ruby
-# Insert hash array
-client.insert('events', [
-  { date: '2024-01-01', event_type: 'click', count: 100 },
-  { date: '2024-01-02', event_type: 'view', count: 250 }
-])
-
-# Insert with explicit columns
-client.insert('events', data, columns: [:date, :event_type, :count])
-
-# Bulk insert from CSV
-client.insert_from_file('events', '/path/to/data.csv', format: 'CSV')
-```
-
-### DDL Operations
+### DDL Commands
 
 ```ruby
 # Create table
-client.execute(<<~SQL)
+client.command(<<~SQL)
   CREATE TABLE events (
     date Date,
     event_type String,
@@ -137,11 +142,21 @@ client.execute(<<~SQL)
   ORDER BY date
 SQL
 
-# Check if table exists
-client.table_exists?('events') # => true
+# Drop table
+client.command('DROP TABLE IF EXISTS events')
+```
 
-# Get table schema
-schema = client.describe_table('events')
+### Inserting Data
+
+```ruby
+# Insert hash array (uses efficient JSONEachRow format)
+client.insert('events', [
+  { date: '2024-01-01', event_type: 'click', count: 100 },
+  { date: '2024-01-02', event_type: 'view', count: 250 }
+])
+
+# Insert with explicit columns
+client.insert('events', data, columns: ['date', 'event_type', 'count'])
 ```
 
 ### Connection Management
@@ -153,20 +168,66 @@ client.ping # => true
 # Get server version
 client.server_version # => "24.1.1.123"
 
-# Execute multiple queries in a session
-client.with_session do |session|
-  session.execute('SET max_memory_usage = 1000000000')
-  session.query('SELECT * FROM large_table')
+# Get pool statistics
+client.pool_stats # => { size: 5, available: 5, in_use: 0 }
+
+# Close all connections
+client.close
+```
+
+## Type Support
+
+ClickhouseRuby supports all ClickHouse types:
+
+| ClickHouse Type | Ruby Type |
+|-----------------|-----------|
+| Int8-Int64, UInt8-UInt64 | Integer |
+| Float32, Float64 | Float |
+| String, FixedString | String |
+| Date, Date32 | Date |
+| DateTime, DateTime64 | Time |
+| UUID | String |
+| Bool | Boolean |
+| Nullable(T) | T or nil |
+| Array(T) | Array |
+| Map(K, V) | Hash |
+| Tuple(T...) | Array |
+| LowCardinality(T) | T |
+
+## Error Handling
+
+```ruby
+begin
+  client.execute('SELECT * FROM nonexistent_table')
+rescue ClickhouseRuby::UnknownTable => e
+  puts "Table not found: #{e.message}"
+  puts "Error code: #{e.code}"        # ClickHouse error code
+  puts "HTTP status: #{e.http_status}" # HTTP response code
+rescue ClickhouseRuby::ConnectionError => e
+  puts "Connection failed: #{e.message}"
+rescue ClickhouseRuby::QueryError => e
+  puts "Query failed: #{e.message}"
 end
 ```
+
+### Error Classes
+
+- `ClickhouseRuby::Error` - Base error class
+- `ClickhouseRuby::ConnectionError` - Connection issues
+- `ClickhouseRuby::ConnectionTimeout` - Timeout errors
+- `ClickhouseRuby::QueryError` - Query execution errors
+- `ClickhouseRuby::SyntaxError` - SQL syntax errors
+- `ClickhouseRuby::UnknownTable` - Table doesn't exist
+- `ClickhouseRuby::UnknownColumn` - Column doesn't exist
+- `ClickhouseRuby::UnknownDatabase` - Database doesn't exist
 
 ## ActiveRecord Integration
 
 ClickhouseRuby provides optional ActiveRecord integration for familiar model-based access.
 
 ```ruby
-# config/initializers/clickhouse-ruby.rb
-require 'clickhouse-ruby/active_record'
+# config/initializers/clickhouse_ruby.rb
+require 'clickhouse_ruby/active_record'
 
 ClickhouseRuby::ActiveRecord.establish_connection(
   host: 'localhost',
@@ -184,24 +245,6 @@ Event.where(date: '2024-01-01').limit(10).each do |event|
 end
 ```
 
-## Error Handling
-
-```ruby
-begin
-  client.query('SELECT * FROM nonexistent_table')
-rescue ClickhouseRuby::ConnectionError => e
-  # Handle connection issues
-  puts "Connection failed: #{e.message}"
-rescue ClickhouseRuby::QueryError => e
-  # Handle query errors
-  puts "Query failed: #{e.message}"
-  puts "Error code: #{e.code}"
-rescue ClickhouseRuby::TimeoutError => e
-  # Handle timeouts
-  puts "Request timed out: #{e.message}"
-end
-```
-
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests.
@@ -212,25 +255,17 @@ After checking out the repo, run `bin/setup` to install dependencies. Then, run 
 # Start ClickHouse
 docker-compose up -d
 
-# Run all tests
-bundle exec rake spec
+# Run unit tests only
+bundle exec rspec spec/unit
 
-# Run only unit tests
-bundle exec rake spec_unit
-
-# Run integration tests
-bundle exec rake spec_integration
+# Run all tests including integration
+CLICKHOUSE_TEST_INTEGRATION=true bundle exec rspec
 ```
 
-### Code Quality
+## Requirements
 
-```bash
-# Run RuboCop
-bundle exec rake rubocop
-
-# Auto-fix issues
-bundle exec rake rubocop_fix
-```
+- Ruby >= 2.6.0
+- ClickHouse >= 20.x (tested with 24.x)
 
 ## Contributing
 

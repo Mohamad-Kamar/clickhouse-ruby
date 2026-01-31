@@ -113,8 +113,8 @@ RSpec.describe ClickhouseRuby::Types::Tuple do
       expect(type.deserialize(nil)).to be_nil
     end
 
-    it 'wraps non-array values in array' do
-      expect(type.deserialize('hello')).to eq(['hello'])
+    it 'raises error for non-tuple string format' do
+      expect { type.deserialize('hello') }.to raise_error(ClickhouseRuby::TypeCastError)
     end
   end
 

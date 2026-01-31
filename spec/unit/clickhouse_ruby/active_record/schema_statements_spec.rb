@@ -3,7 +3,10 @@
 require 'spec_helper'
 
 # Only run these tests if ActiveRecord is available
-RSpec.describe ClickhouseRuby::ActiveRecord::SchemaStatements, skip: !defined?(ActiveRecord) do
+# Guard must be at file level since constant resolution happens at parse time
+return unless defined?(ActiveRecord) && defined?(ClickhouseRuby::ActiveRecord::SchemaStatements)
+
+RSpec.describe ClickhouseRuby::ActiveRecord::SchemaStatements do
   let(:config) do
     {
       host: 'localhost',

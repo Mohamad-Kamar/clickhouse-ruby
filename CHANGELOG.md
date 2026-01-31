@@ -53,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Project Infrastructure
 - RSpec test suite with unit and integration tests
-- VCR for HTTP interaction recording
+- WebMock for HTTP mocking in unit tests
 - Docker Compose setup for ClickHouse testing
 - GitHub Actions CI workflow
 - RuboCop configuration

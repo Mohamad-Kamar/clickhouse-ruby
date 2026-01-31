@@ -234,7 +234,7 @@ bundle exec rake rubocop_fix
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/yourusername/clickhouse-ruby.
+Bug reports and pull requests are welcome on GitHub at https://github.com/Mohamad-Kamar/clickhouse-ruby.
 
 1. Fork it
 2. Create your feature branch (`git checkout -b feature/my-new-feature`)

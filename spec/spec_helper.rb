@@ -18,6 +18,9 @@ require 'bundler/setup'
 require 'clickhouse_ruby'
 require 'webmock/rspec'
 
+# Allow localhost connections for integration tests
+WebMock.disable_net_connect!(allow_localhost: true)
+
 # Load support files
 Dir[File.join(__dir__, 'support', '**', '*.rb')].sort.each { |f| require f }
 

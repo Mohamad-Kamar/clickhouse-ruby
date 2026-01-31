@@ -46,8 +46,9 @@ RSpec.describe 'Error Handling', :integration do
 
       it 'does NOT silently fail on DELETE errors with subquery issues' do
         # This is the specific case from issue #230
+        # Use mutations_sync=1 to make mutation synchronous and catch errors immediately
         expect {
-          client.execute(<<~SQL)
+          client.execute(<<~SQL, settings: { mutations_sync: 1 })
             ALTER TABLE test_delete_errors
             DELETE WHERE id IN (
               SELECT id FROM nonexistent_table

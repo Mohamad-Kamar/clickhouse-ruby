@@ -71,12 +71,12 @@ module ClickhouseRuby
       # @param value [String] the string to escape
       # @return [String] the escaped string
       def escape_string(value)
-        value.gsub("\\", "\\\\")
-             .gsub("'", "\\'")
-             .gsub("\n", "\\n")
-             .gsub("\r", "\\r")
-             .gsub("\t", "\\t")
-             .gsub("\0", "\\0")
+        value.gsub("\\", "\\\\\\\\")
+             .gsub("'", "\\\\'")
+             .gsub("\n", "\\\\n")
+             .gsub("\r", "\\\\r")
+             .gsub("\t", "\\\\t")
+             .gsub("\0", "\\\\0")
       end
     end
   end

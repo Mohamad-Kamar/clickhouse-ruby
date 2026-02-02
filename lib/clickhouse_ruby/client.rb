@@ -167,6 +167,91 @@ module ClickhouseRuby
       result.first["version"]
     end
 
+    # Returns the query execution plan for a SQL query
+    #
+    # Uses EXPLAIN to show how ClickHouse will execute the query.
+    #
+    # @param sql [String] the SQL query to explain
+    # @param type [Symbol] type of explain (:plan, :pipeline, :estimate, :ast, :syntax)
+    # @param settings [Hash] ClickHouse settings
+    # @return [Array<Hash>] the query plan rows
+    #
+    # @example Basic explain
+    #   client.explain('SELECT * FROM events WHERE date > today()')
+    #   # => [{"explain" => "Expression ..."}]
+    #
+    # @example Pipeline explain
+    #   client.explain('SELECT count() FROM events', type: :pipeline)
+    #
+    # @example Estimate query cost
+    #   client.explain('SELECT * FROM events', type: :estimate)
+    def explain(sql, type: :plan, settings: {})
+      explain_keyword = case type
+                        when :plan then "EXPLAIN"
+                        when :pipeline then "EXPLAIN PIPELINE"
+                        when :estimate then "EXPLAIN ESTIMATE"
+                        when :ast then "EXPLAIN AST"
+                        when :syntax then "EXPLAIN SYNTAX"
+                        else
+                          raise ArgumentError, "Unknown explain type: #{type}. Valid types: :plan, :pipeline, :estimate, :ast, :syntax"
+                        end
+
+      explain_sql = "#{explain_keyword} #{sql.strip}"
+      execute(explain_sql, settings: settings).to_a
+    end
+
+    # Returns detailed health status of the client and server
+    #
+    # Provides comprehensive health information including server status,
+    # connection pool state, and server metrics.
+    #
+    # @return [Hash] health status
+    #
+    # @example
+    #   client.health_check
+    #   # => {
+    #   #   status: :healthy,
+    #   #   server_reachable: true,
+    #   #   server_version: "24.1.0",
+    #   #   pool: { available: 3, in_use: 2, total: 5 },
+    #   #   uptime_seconds: 3600
+    #   # }
+    def health_check
+      started_at = Instrumentation.monotonic_time
+      server_reachable = ping
+      version = nil
+      server_metrics = {}
+
+      if server_reachable
+        begin
+          version = server_version
+
+          # Get server uptime and metrics
+          metrics_result = execute(<<~SQL, settings: { max_execution_time: 5 })
+            SELECT
+              uptime() AS uptime_seconds,
+              currentDatabase() AS current_database
+          SQL
+          server_metrics = metrics_result.first if metrics_result.any?
+        rescue StandardError
+          # Ignore errors fetching extended info
+        end
+      end
+
+      pool_health = @pool.health_check
+      check_duration_ms = Instrumentation.duration_ms(started_at)
+
+      {
+        status: server_reachable ? :healthy : :unhealthy,
+        server_reachable: server_reachable,
+        server_version: version,
+        current_database: server_metrics["current_database"],
+        server_uptime_seconds: server_metrics["uptime_seconds"],
+        pool: pool_health,
+        check_duration_ms: check_duration_ms.round(2),
+      }
+    end
+
     # Closes all connections in the pool
     #
     # Call this when shutting down to clean up resources.
@@ -258,6 +343,9 @@ module ClickhouseRuby
     # @param format [String] response format (default: JSONCompact)
     # @return [Result] query results
     def execute_internal(sql, settings: {}, format: DEFAULT_FORMAT)
+      started_at = Instrumentation.monotonic_time
+      row_count = 0
+
       # Build the query with format
       query_with_format = "#{sql.strip} FORMAT #{format}"
 
@@ -268,7 +356,16 @@ module ClickhouseRuby
       response = execute_request(query_with_format, params)
 
       # Parse response based on format
-      parse_response(response, sql, format)
+      result = parse_response(response, sql, format)
+      row_count = result.size
+
+      # Instrument successful query
+      instrument_query_complete(sql, settings, started_at, row_count)
+
+      result
+    rescue StandardError => e
+      instrument_query_error(sql, settings, started_at, e)
+      raise
     end
 
     # Internal insert without retry wrapper
@@ -280,6 +377,9 @@ module ClickhouseRuby
     # @param format [Symbol] insert format
     # @return [Boolean] true if successful
     def insert_internal(table, rows, columns: nil, settings: {}, format: :json_each_row)
+      started_at = Instrumentation.monotonic_time
+      row_count = rows.size
+
       # Determine columns from first row if not specified
       columns ||= rows.first.keys.map(&:to_s)
 
@@ -312,7 +412,13 @@ module ClickhouseRuby
         handle_response(response, sql)
       end
 
+      # Instrument successful insert
+      instrument_insert_complete(table, row_count, settings, started_at)
+
       true
+    rescue StandardError => e
+      instrument_insert_error(table, row_count, settings, started_at, e)
+      raise
     end
 
     # Builds query parameters including database and settings
@@ -572,6 +678,111 @@ module ClickhouseRuby
       @logger.error(
         "[ClickhouseRuby] ClickHouse error: #{message} " \
         "(code: #{code || "unknown"}, http: #{http_status}, sql: #{truncate_sql(sql, 200)})",
+      )
+    end
+
+    # ========================================================================
+    # Instrumentation helpers
+    # ========================================================================
+
+    # Instruments a successful query completion
+    #
+    # @param sql [String] the SQL query
+    # @param settings [Hash] query settings
+    # @param started_at [Float] monotonic start time
+    # @param row_count [Integer] number of rows returned
+    def instrument_query_complete(sql, settings, started_at, row_count)
+      duration_ms = Instrumentation.duration_ms(started_at)
+
+      payload = {
+        sql: truncate_sql(sql, 500),
+        settings: settings,
+        row_count: row_count,
+        duration_ms: duration_ms,
+      }
+
+      Instrumentation.publish(Instrumentation::EVENTS[:query_complete], payload)
+      log_query_timing(sql, duration_ms) if @logger && @config.log_level == :debug
+    end
+
+    # Instruments a query error
+    #
+    # @param sql [String] the SQL query
+    # @param settings [Hash] query settings
+    # @param started_at [Float] monotonic start time
+    # @param error [StandardError] the error
+    def instrument_query_error(sql, settings, started_at, error)
+      duration_ms = Instrumentation.duration_ms(started_at)
+
+      payload = {
+        sql: truncate_sql(sql, 500),
+        settings: settings,
+        duration_ms: duration_ms,
+        exception: [error.class.name, error.message],
+      }
+
+      Instrumentation.publish(Instrumentation::EVENTS[:query_error], payload)
+    end
+
+    # Instruments a successful insert completion
+    #
+    # @param table [String] the table name
+    # @param row_count [Integer] number of rows inserted
+    # @param settings [Hash] query settings
+    # @param started_at [Float] monotonic start time
+    def instrument_insert_complete(table, row_count, settings, started_at)
+      duration_ms = Instrumentation.duration_ms(started_at)
+
+      payload = {
+        table: table,
+        row_count: row_count,
+        settings: settings,
+        duration_ms: duration_ms,
+      }
+
+      Instrumentation.publish(Instrumentation::EVENTS[:insert_complete], payload)
+      log_insert_timing(table, row_count, duration_ms) if @logger && @config.log_level == :debug
+    end
+
+    # Instruments an insert error
+    #
+    # @param table [String] the table name
+    # @param row_count [Integer] number of rows attempted
+    # @param settings [Hash] query settings
+    # @param started_at [Float] monotonic start time
+    # @param error [StandardError] the error
+    def instrument_insert_error(table, row_count, settings, started_at, error)
+      duration_ms = Instrumentation.duration_ms(started_at)
+
+      payload = {
+        table: table,
+        row_count: row_count,
+        settings: settings,
+        duration_ms: duration_ms,
+        exception: [error.class.name, error.message],
+      }
+
+      Instrumentation.publish(Instrumentation::EVENTS[:insert_complete], payload)
+    end
+
+    # Logs query timing at debug level
+    #
+    # @param sql [String] the SQL query
+    # @param duration_ms [Float] duration in milliseconds
+    def log_query_timing(sql, duration_ms)
+      @logger.debug(
+        "[ClickhouseRuby] Query completed in #{duration_ms.round(2)}ms: #{truncate_sql(sql, 100)}",
+      )
+    end
+
+    # Logs insert timing at debug level
+    #
+    # @param table [String] the table name
+    # @param row_count [Integer] number of rows
+    # @param duration_ms [Float] duration in milliseconds
+    def log_insert_timing(table, row_count, duration_ms)
+      @logger.debug(
+        "[ClickhouseRuby] Insert #{row_count} rows into #{table} in #{duration_ms.round(2)}ms",
       )
     end
   end

@@ -69,11 +69,26 @@ module ClickhouseRuby
     # @return [Object] the block's return value
     # @raise [PoolTimeout] if no connection becomes available
     def with_connection
+      started_at = Instrumentation.monotonic_time
       conn = checkout
+      wait_time_ms = Instrumentation.duration_ms(started_at)
+
+      # Publish pool checkout event
+      Instrumentation.publish(Instrumentation::EVENTS[:pool_checkout], {
+        pool_id: object_id,
+        wait_time_ms: wait_time_ms,
+        connection_id: conn.object_id,
+      },)
+
       begin
         yield conn
       ensure
         checkin(conn)
+        # Publish pool checkin event
+        Instrumentation.publish(Instrumentation::EVENTS[:pool_checkin], {
+          pool_id: object_id,
+          connection_id: conn.object_id,
+        },)
       end
     end
 
@@ -109,6 +124,13 @@ module ClickhouseRuby
           remaining = deadline - Time.now
           if remaining <= 0
             @total_timeouts += 1
+            # Publish pool timeout event
+            Instrumentation.publish(Instrumentation::EVENTS[:pool_timeout], {
+              pool_id: object_id,
+              wait_time_ms: @timeout * 1000,
+              pool_size: @size,
+              in_use: @in_use.size,
+            },)
             raise PoolTimeout, "Could not obtain a connection from the pool within #{@timeout} seconds " \
                                "(pool size: #{@size}, in use: #{@in_use.size})"
           end
@@ -250,7 +272,57 @@ module ClickhouseRuby
           total_connections: @all_connections.size,
           total_checkouts: @total_checkouts,
           total_timeouts: @total_timeouts,
-          uptime_seconds: Time.now - @created_at,
+          uptime_seconds: (Time.now - @created_at).round(2),
+        }
+      end
+    end
+
+    # Returns detailed pool statistics for monitoring
+    #
+    # Provides comprehensive metrics suitable for Prometheus/StatsD export.
+    #
+    # @return [Hash] detailed pool statistics
+    #
+    # @example
+    #   pool.detailed_stats
+    #   # => {
+    #   #   capacity: 5,
+    #   #   connections: { total: 5, available: 3, in_use: 2 },
+    #   #   utilization_percent: 40.0,
+    #   #   checkouts: { total: 1000, rate_per_minute: 16.7 },
+    #   #   timeouts: { total: 5, rate_per_minute: 0.08 },
+    #   #   uptime_seconds: 3600
+    #   # }
+    def detailed_stats
+      @mutex.synchronize do
+        uptime = Time.now - @created_at
+        uptime_minutes = uptime / 60.0
+
+        in_use = @in_use.size
+        available = @available.size
+        total = @all_connections.size
+        utilization = total.positive? ? (in_use.to_f / total * 100).round(2) : 0.0
+
+        checkout_rate = uptime_minutes.positive? ? (@total_checkouts / uptime_minutes).round(2) : 0.0
+        timeout_rate = uptime_minutes.positive? ? (@total_timeouts / uptime_minutes).round(4) : 0.0
+
+        {
+          capacity: @size,
+          connections: {
+            total: total,
+            available: available,
+            in_use: in_use,
+          },
+          utilization_percent: utilization,
+          checkouts: {
+            total: @total_checkouts,
+            rate_per_minute: checkout_rate,
+          },
+          timeouts: {
+            total: @total_timeouts,
+            rate_per_minute: timeout_rate,
+          },
+          uptime_seconds: uptime.round(2),
         }
       end
     end

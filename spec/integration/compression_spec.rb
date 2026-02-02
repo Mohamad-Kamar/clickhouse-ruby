@@ -41,9 +41,9 @@ RSpec.describe "HTTP Compression", :integration do
       result = client.execute("SELECT * FROM test_compression ORDER BY id")
 
       expect(result.data.length).to eq(3)
-      expect(result.data[0]).to eq([1, "test1"])
-      expect(result.data[1]).to eq([2, "test2"])
-      expect(result.data[2]).to eq([3, "test3"])
+      expect(result.data[0]).to eq({"id" => 1, "name" => "test1"})
+      expect(result.data[1]).to eq({"id" => 2, "name" => "test2"})
+      expect(result.data[2]).to eq({"id" => 3, "name" => "test3"})
     end
 
     it "handles empty result sets with compression" do

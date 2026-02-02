@@ -205,7 +205,7 @@ module ClickhouseRuby
     #     .to_a
     def stream_execute(sql, settings: {})
       # Create dedicated connection (not from pool)
-      connection = Connection.new(@config.to_connection_options)
+      connection = Connection.new(**@config.to_connection_options)
 
       StreamingResult.new(
         connection,

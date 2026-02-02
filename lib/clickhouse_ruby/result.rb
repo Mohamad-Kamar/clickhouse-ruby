@@ -84,6 +84,7 @@ module ClickhouseRuby
     end
     alias size count
     alias length count
+    alias data rows
 
     # Returns whether there are no rows
     #

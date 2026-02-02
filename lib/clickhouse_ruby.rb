@@ -3,6 +3,7 @@
 require_relative "clickhouse_ruby/version"
 require_relative "clickhouse_ruby/errors"
 require_relative "clickhouse_ruby/configuration"
+require_relative "clickhouse_ruby/instrumentation"
 require_relative "clickhouse_ruby/types"
 require_relative "clickhouse_ruby/result"
 require_relative "clickhouse_ruby/retry_handler"

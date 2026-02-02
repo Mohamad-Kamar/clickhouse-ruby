@@ -101,7 +101,7 @@ module ClickhouseRuby
       # @param payload [Hash] the payload
       # @yield the block to execute
       # @return [Object] the result of the block
-      def instrument_without_as(event_name, payload)
+      def instrument_without_as(_event_name, payload)
         started_at = monotonic_time
         result = yield
         payload[:duration_ms] = duration_ms(started_at)

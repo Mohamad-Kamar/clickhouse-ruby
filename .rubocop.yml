@@ -2,7 +2,7 @@ require:
   - rubocop-rspec
 
 AllCops:
-  TargetRubyVersion: 3.1
+  TargetRubyVersion: 2.6
   NewCops: enable
   SuggestExtensions: false
   Exclude:
@@ -11,6 +11,13 @@ AllCops:
     - "spec/fixtures/**/*"
     - "spec/vcr_cassettes/**/*"
     - "*.gemspec"
+
+# Disable Ruby 3.1+ features since we support Ruby 2.6+
+Style/ExplicitBlockArgument:
+  Enabled: false
+
+Naming/BlockForwarding:
+  Enabled: false
 
 # Benchmark files are scripts, not libraries, so they don't need execute permissions
 Lint/ScriptPermission:

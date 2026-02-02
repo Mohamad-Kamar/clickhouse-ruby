@@ -37,12 +37,7 @@ module ClickhouseRuby
               when ::String
                 parse_array_string(value)
               else
-                raise TypeCastError.new(
-                  "Cannot cast #{value.class} to Array",
-                  from_type: value.class.name,
-                  to_type: to_s,
-                  value: value,
-                )
+                raise_cast_error(value, "Cannot cast #{value.class} to Array")
               end
 
         arr.map { |v| @element_type.cast(v) }
@@ -98,14 +93,7 @@ module ClickhouseRuby
         return [] if stripped == "[]"
 
         # Remove outer brackets
-        unless stripped.start_with?("[") && stripped.end_with?("]")
-          raise TypeCastError.new(
-            "Invalid array format: '#{value}'",
-            from_type: "String",
-            to_type: to_s,
-            value: value,
-          )
-        end
+        raise_format_error(value, "array") unless stripped.start_with?("[") && stripped.end_with?("]")
 
         inner = stripped[1...-1]
         return [] if inner.strip.empty?
@@ -119,48 +107,9 @@ module ClickhouseRuby
       # @param str [String] the inner array string
       # @return [Array] the parsed elements
       def parse_elements(str)
-        elements = []
-        current = ""
-        depth = 0
-        in_string = false
-        escape_next = false
-
-        str.each_char do |char|
-          if escape_next
-            current += char
-            escape_next = false
-            next
-          end
-
-          case char
-          when "\\"
-            escape_next = true
-            current += char
-          when "'"
-            in_string = !in_string
-            current += char
-          when "[", "("
-            depth += 1 unless in_string
-            current += char
-          when "]", ")"
-            depth -= 1 unless in_string
-            current += char
-          when ","
-            if depth.zero? && !in_string
-              elements << parse_element(current.strip)
-              current = ""
-            else
-              current += char
-            end
-          else
-            current += char
-          end
+        StringParser.parse_delimited(str, open_brackets: ["[", "("], close_brackets: ["]", ")"]).map do |el|
+          parse_element(el)
         end
-
-        # Don't forget the last element
-        elements << parse_element(current.strip) unless current.strip.empty?
-
-        elements
       end
 
       # Parses a single element, removing quotes if necessary
@@ -168,12 +117,10 @@ module ClickhouseRuby
       # @param str [String] the element string
       # @return [Object] the parsed element
       def parse_element(str)
-        # Remove surrounding quotes if present
+        # Unquote strings (e.g., "'[test]'" -> "[test]")
+        # Preserve unquoted values like nested arrays [1, 2] or numbers
         if str.start_with?("'") && str.end_with?("'")
-          str[1...-1].gsub("\\'", "'")
-        elsif str.start_with?("[")
-          # Nested array - let the element type handle it
-          str
+          StringParser.unquote(str)
         else
           str
         end

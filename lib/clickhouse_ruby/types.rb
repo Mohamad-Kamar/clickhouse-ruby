@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
-# Load base class first, then parser, then specific types, then registry last
+# Load base class first, then modules, then parser, then specific types, then registry last
 require_relative "types/base"
+require_relative "types/null_safe"
+require_relative "types/string_parser"
 require_relative "types/parser"
 require_relative "types/integer"
 require_relative "types/float"

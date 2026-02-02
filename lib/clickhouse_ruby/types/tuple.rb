@@ -37,12 +37,7 @@ module ClickhouseRuby
               when ::String
                 parse_tuple_string(value)
               else
-                raise TypeCastError.new(
-                  "Cannot cast #{value.class} to Tuple",
-                  from_type: value.class.name,
-                  to_type: to_s,
-                  value: value,
-                )
+                raise_cast_error(value, "Cannot cast #{value.class} to Tuple")
               end
 
         cast_elements(arr)
@@ -125,14 +120,7 @@ module ClickhouseRuby
         return [] if stripped == "()"
 
         # Remove outer parentheses
-        unless stripped.start_with?("(") && stripped.end_with?(")")
-          raise TypeCastError.new(
-            "Invalid tuple format: '#{value}'",
-            from_type: "String",
-            to_type: to_s,
-            value: value,
-          )
-        end
+        raise_format_error(value, "tuple") unless stripped.start_with?("(") && stripped.end_with?(")")
 
         inner = stripped[1...-1]
         return [] if inner.strip.empty?
@@ -146,48 +134,7 @@ module ClickhouseRuby
       # @param str [String] the inner tuple string
       # @return [Array] the parsed elements
       def parse_elements(str)
-        elements = []
-        current = ""
-        depth = 0
-        in_string = false
-        escape_next = false
-
-        str.each_char do |char|
-          if escape_next
-            current += char
-            escape_next = false
-            next
-          end
-
-          case char
-          when "\\"
-            escape_next = true
-            current += char
-          when "'"
-            in_string = !in_string
-            current += char
-          when "(", "[", "{"
-            depth += 1 unless in_string
-            current += char
-          when ")", "]", "}"
-            depth -= 1 unless in_string
-            current += char
-          when ","
-            if depth.zero? && !in_string
-              elements << parse_element(current.strip)
-              current = ""
-            else
-              current += char
-            end
-          else
-            current += char
-          end
-        end
-
-        # Don't forget the last element
-        elements << parse_element(current.strip) unless current.strip.empty?
-
-        elements
+        StringParser.parse_delimited(str).map { |el| parse_element(el) }
       end
 
       # Parses a single element, removing quotes if necessary
@@ -195,11 +142,7 @@ module ClickhouseRuby
       # @param str [String] the element string
       # @return [Object] the parsed element
       def parse_element(str)
-        if str.start_with?("'") && str.end_with?("'")
-          str[1...-1].gsub("\\'", "'")
-        else
-          str
-        end
+        StringParser.unquote(str)
       end
     end
   end

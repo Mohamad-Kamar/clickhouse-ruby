@@ -226,7 +226,7 @@ Event.insert_all(records)  # Uses JSONEachRow
 - [x] CI passing on all Ruby/Rails versions ✅
 - [x] Manual testing against ClickHouse 24.x ✅ (24.1.8.22)
 - [x] No known critical bugs ✅ All tests pass
-- [ ] Published to RubyGems
+- [x] Published to RubyGems
 
 ## Implementation Summary
 

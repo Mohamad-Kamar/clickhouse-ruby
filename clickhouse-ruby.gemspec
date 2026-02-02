@@ -40,4 +40,7 @@ Gem::Specification.new do |spec|
   # Linting (requires Ruby 2.7+, but we'll use 1.47 for Ruby 2.6 compatibility)
   spec.add_development_dependency "rubocop", "~> 1.47"
   spec.add_development_dependency "rubocop-rspec", "~> 2.20"
+
+  # Benchmarking
+  spec.add_development_dependency "benchmark-ips", "~> 2.12"
 end

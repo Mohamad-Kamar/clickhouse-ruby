@@ -12,11 +12,17 @@ AllCops:
     - "spec/vcr_cassettes/**/*"
     - "*.gemspec"
 
+# Benchmark files are scripts, not libraries, so they don't need execute permissions
+Lint/ScriptPermission:
+  Exclude:
+    - "benchmark/**/*"
+
 # Layout cops
 Layout/LineLength:
   Max: 120
   Exclude:
     - "spec/**/*"
+    - "benchmark/**/*"
 
 Layout/MultilineMethodCallIndentation:
   EnforcedStyle: indented
@@ -32,21 +38,29 @@ Metrics/AbcSize:
   Max: 20
   Exclude:
     - "spec/**/*"
+    - "benchmark/**/*"
 
 Metrics/BlockLength:
   Exclude:
     - "spec/**/*"
+    - "benchmark/**/*"
     - "Rakefile"
 
 Metrics/ClassLength:
   Max: 150
   Exclude:
     - "spec/**/*"
+    - "benchmark/**/*"
 
 Metrics/MethodLength:
   Max: 20
   Exclude:
     - "spec/**/*"
+    - "benchmark/**/*"
+
+Metrics/ModuleLength:
+  Exclude:
+    - "benchmark/**/*"
 
 Metrics/ParameterLists:
   Max: 6

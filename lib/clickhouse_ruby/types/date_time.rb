@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require 'time'
-require 'date'
+require "time"
+require "date"
 
 module ClickhouseRuby
   module Types
@@ -55,7 +55,7 @@ module ClickhouseRuby
             "Cannot cast #{value.class} to #{name}",
             from_type: value.class.name,
             to_type: name,
-            value: value
+            value: value,
           )
         end
       end
@@ -84,7 +84,7 @@ module ClickhouseRuby
       # @param value [Time, Date, nil] the value to serialize
       # @return [String] the SQL literal
       def serialize(value)
-        return 'NULL' if value.nil?
+        return "NULL" if value.nil?
 
         if date_only?
           format_date(value)
@@ -97,7 +97,7 @@ module ClickhouseRuby
       #
       # @return [Boolean] true if date-only
       def date_only?
-        name.start_with?('Date') && !name.start_with?('DateTime')
+        name.start_with?("Date") && !name.start_with?("DateTime")
       end
 
       private
@@ -113,9 +113,9 @@ module ClickhouseRuby
         if stripped.empty?
           raise TypeCastError.new(
             "Cannot cast empty string to #{name}",
-            from_type: 'String',
+            from_type: "String",
             to_type: name,
-            value: value
+            value: value,
           )
         end
 
@@ -127,9 +127,9 @@ module ClickhouseRuby
       rescue ArgumentError => e
         raise TypeCastError.new(
           "Cannot cast '#{value}' to #{name}: #{e.message}",
-          from_type: 'String',
+          from_type: "String",
           to_type: name,
-          value: value
+          value: value,
         )
       end
 
@@ -139,7 +139,7 @@ module ClickhouseRuby
       # @return [String] the formatted SQL literal
       def format_date(value)
         date = value.respond_to?(:to_date) ? value.to_date : value
-        "'#{date.strftime('%Y-%m-%d')}'"
+        "'#{date.strftime("%Y-%m-%d")}'"
       end
 
       # Formats a datetime value for SQL
@@ -149,13 +149,13 @@ module ClickhouseRuby
       def format_datetime(value)
         time = value.respond_to?(:to_time) ? value.to_time : value
 
-        if @precision && @precision > 0
+        if @precision&.positive?
           # DateTime64 with fractional seconds
           format_str = "%Y-%m-%d %H:%M:%S.%#{@precision}N"
           "'#{time.strftime(format_str)}'"
         else
           # Regular DateTime
-          "'#{time.strftime('%Y-%m-%d %H:%M:%S')}'"
+          "'#{time.strftime("%Y-%m-%d %H:%M:%S")}'"
         end
       end
     end

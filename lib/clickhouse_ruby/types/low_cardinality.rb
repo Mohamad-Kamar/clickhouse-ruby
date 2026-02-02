@@ -20,7 +20,7 @@ module ClickhouseRuby
       # @param element_type [Base] the wrapped type
       def initialize(name, element_type: nil)
         super(name)
-        @element_type = element_type || Base.new('String')
+        @element_type = element_type || Base.new("String")
       end
 
       # Converts a Ruby value using the wrapped type

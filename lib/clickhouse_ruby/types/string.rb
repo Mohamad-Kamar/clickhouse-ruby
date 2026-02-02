@@ -29,9 +29,7 @@ module ClickhouseRuby
         str = value.to_s
 
         # For FixedString, pad or truncate to length
-        if @length
-          str = str.ljust(@length, "\0")[0, @length]
-        end
+        str = str.ljust(@length, "\0")[0, @length] if @length
 
         str
       end
@@ -46,9 +44,7 @@ module ClickhouseRuby
         str = value.to_s
 
         # For FixedString, remove trailing null bytes
-        if @length
-          str = str.gsub(/\0+\z/, '')
-        end
+        str = str.gsub(/\0+\z/, "") if @length
 
         str
       end
@@ -58,7 +54,7 @@ module ClickhouseRuby
       # @param value [String, nil] the value to serialize
       # @return [String] the SQL literal
       def serialize(value)
-        return 'NULL' if value.nil?
+        return "NULL" if value.nil?
 
         escaped = escape_string(value.to_s)
         "'#{escaped}'"
@@ -72,11 +68,11 @@ module ClickhouseRuby
       # @return [String] the escaped string
       def escape_string(value)
         value.gsub("\\", "\\\\\\\\")
-             .gsub("'", "\\\\'")
-             .gsub("\n", "\\\\n")
-             .gsub("\r", "\\\\r")
-             .gsub("\t", "\\\\t")
-             .gsub("\0", "\\\\0")
+          .gsub("'", "\\\\'")
+          .gsub("\n", "\\\\n")
+          .gsub("\r", "\\\\r")
+          .gsub("\t", "\\\\t")
+          .gsub("\0", "\\\\0")
       end
     end
   end

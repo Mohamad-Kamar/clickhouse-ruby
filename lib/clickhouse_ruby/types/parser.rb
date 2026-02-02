@@ -58,12 +58,12 @@ module ClickhouseRuby
       # @return [Hash] the parsed AST with :type and optional :args keys
       # @raise [ParseError] if the type string is invalid
       def parse(type_string)
-        raise ParseError.new('Type string cannot be nil') if type_string.nil?
+        raise ParseError, "Type string cannot be nil" if type_string.nil?
 
         @input = type_string.strip
         @pos = 0
 
-        raise ParseError.new('Type string cannot be empty', input: type_string) if @input.empty?
+        raise ParseError.new("Type string cannot be empty", input: type_string) if @input.empty?
 
         result = parse_type
         skip_whitespace
@@ -101,11 +101,11 @@ module ClickhouseRuby
           value = parse_string_literal
           skip_whitespace
           # Handle Enum value assignment: 'name' = value (or 'name' = -1)
-          if peek == '='
-            consume('=')
+          if peek == "="
+            consume("=")
             skip_whitespace
             # Skip optional negative sign
-            if peek == '-'
+            if peek == "-"
               @pos += 1
               skip_whitespace
             end
@@ -118,10 +118,10 @@ module ClickhouseRuby
         name = parse_identifier
 
         skip_whitespace
-        if peek == '('
-          consume('(')
+        if peek == "("
+          consume("(")
           args = parse_type_list
-          consume(')')
+          consume(")")
           { type: name, args: args }
         else
           { type: name }
@@ -136,12 +136,12 @@ module ClickhouseRuby
         skip_whitespace
 
         # Handle empty argument list
-        return types if peek == ')'
+        return types if peek == ")"
 
         types << parse_type
 
-        while peek == ','
-          consume(',')
+        while peek == ","
+          consume(",")
           types << parse_type
         end
 
@@ -158,15 +158,13 @@ module ClickhouseRuby
 
         # First character must be letter or underscore
         unless @pos < @input.length && identifier_start_char?(@input[@pos])
-          raise ParseError.new('Expected type name', position: @pos, input: @input)
+          raise ParseError.new("Expected type name", position: @pos, input: @input)
         end
 
         @pos += 1
 
         # Subsequent characters can be letters, digits, or underscores
-        while @pos < @input.length && identifier_char?(@input[@pos])
-          @pos += 1
-        end
+        @pos += 1 while @pos < @input.length && identifier_char?(@input[@pos])
 
         @input[start_pos...@pos]
       end
@@ -201,9 +199,7 @@ module ClickhouseRuby
       def parse_numeric
         start_pos = @pos
 
-        while @pos < @input.length && numeric_char?(@input[@pos])
-          @pos += 1
-        end
+        @pos += 1 while @pos < @input.length && numeric_char?(@input[@pos])
 
         @input[start_pos...@pos]
       end
@@ -217,7 +213,7 @@ module ClickhouseRuby
 
         while @pos < @input.length && @input[@pos] != "'"
           # Handle escaped quotes
-          @pos += 1 if @input[@pos] == '\\' && @pos + 1 < @input.length
+          @pos += 1 if @input[@pos] == "\\" && @pos + 1 < @input.length
           @pos += 1
         end
 
@@ -240,7 +236,7 @@ module ClickhouseRuby
       # @raise [ParseError] if the character doesn't match
       def consume(expected)
         skip_whitespace
-        actual = @pos < @input.length ? @input[@pos] : 'end of input'
+        actual = @pos < @input.length ? @input[@pos] : "end of input"
 
         unless actual == expected
           raise ParseError.new("Expected '#{expected}', got '#{actual}'", position: @pos, input: @input)

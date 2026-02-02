@@ -23,9 +23,9 @@ module ClickhouseRuby
       # @param arg_types [Array<Base>] array of [key_type, value_type]
       def initialize(name, arg_types: nil)
         super(name)
-        arg_types ||= [Base.new('String'), Base.new('String')]
+        arg_types ||= [Base.new("String"), Base.new("String")]
         @key_type = arg_types[0]
-        @value_type = arg_types[1] || Base.new('String')
+        @value_type = arg_types[1] || Base.new("String")
       end
 
       # Converts a Ruby value to a map (Hash)
@@ -46,12 +46,12 @@ module ClickhouseRuby
                    "Cannot cast #{value.class} to Map",
                    from_type: value.class.name,
                    to_type: to_s,
-                   value: value
+                   value: value,
                  )
                end
 
         hash.transform_keys { |k| @key_type.cast(k) }
-            .transform_values { |v| @value_type.cast(v) }
+          .transform_values { |v| @value_type.cast(v) }
       end
 
       # Converts a value from ClickHouse to a Ruby Hash
@@ -71,7 +71,7 @@ module ClickhouseRuby
                end
 
         hash.transform_keys { |k| @key_type.deserialize(k) }
-            .transform_values { |v| @value_type.deserialize(v) }
+          .transform_values { |v| @value_type.deserialize(v) }
       end
 
       # Converts a hash to SQL literal
@@ -79,13 +79,13 @@ module ClickhouseRuby
       # @param value [Hash, nil] the value to serialize
       # @return [String] the SQL literal
       def serialize(value)
-        return 'NULL' if value.nil?
+        return "NULL" if value.nil?
 
         pairs = value.map do |k, v|
           "#{@key_type.serialize(k)}: #{@value_type.serialize(v)}"
         end
 
-        "{#{pairs.join(', ')}}"
+        "{#{pairs.join(", ")}}"
       end
 
       # Returns the full type string including key and value types
@@ -105,15 +105,15 @@ module ClickhouseRuby
         stripped = value.strip
 
         # Handle empty map
-        return {} if stripped == '{}'
+        return {} if stripped == "{}"
 
         # Remove outer braces
-        unless stripped.start_with?('{') && stripped.end_with?('}')
+        unless stripped.start_with?("{") && stripped.end_with?("}")
           raise TypeCastError.new(
             "Invalid map format: '#{value}'",
-            from_type: 'String',
+            from_type: "String",
             to_type: to_s,
-            value: value
+            value: value,
           )
         end
 
@@ -130,7 +130,7 @@ module ClickhouseRuby
       # @return [Hash] the parsed pairs
       def parse_pairs(str)
         result = {}
-        current = ''
+        current = ""
         depth = 0
         in_string = false
         escape_next = false
@@ -143,23 +143,23 @@ module ClickhouseRuby
           end
 
           case char
-          when '\\'
+          when "\\"
             escape_next = true
             current += char
           when "'"
             in_string = !in_string
             current += char
-          when '{', '[', '('
+          when "{", "[", "("
             depth += 1 unless in_string
             current += char
-          when '}', ']', ')'
+          when "}", "]", ")"
             depth -= 1 unless in_string
             current += char
-          when ','
+          when ","
             if depth.zero? && !in_string
               key, value = parse_pair(current.strip)
               result[key] = value
-              current = ''
+              current = ""
             else
               current += char
             end
@@ -183,14 +183,14 @@ module ClickhouseRuby
       # @return [Array] [key, value]
       def parse_pair(str)
         # Find the colon separator (not inside quotes or nested structures)
-        colon_idx = find_separator(str, ':')
+        colon_idx = find_separator(str, ":")
 
         if colon_idx.nil?
           raise TypeCastError.new(
             "Invalid map pair format: '#{str}'",
-            from_type: 'String',
+            from_type: "String",
             to_type: to_s,
-            value: str
+            value: str,
           )
         end
 
@@ -217,13 +217,13 @@ module ClickhouseRuby
           end
 
           case char
-          when '\\'
+          when "\\"
             escape_next = true
           when "'"
             in_string = !in_string
-          when '{', '[', '('
+          when "{", "[", "("
             depth += 1 unless in_string
-          when '}', ']', ')'
+          when "}", "]", ")"
             depth -= 1 unless in_string
           when sep
             return idx if depth.zero? && !in_string

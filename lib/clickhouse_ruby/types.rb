@@ -1,20 +1,22 @@
 # frozen_string_literal: true
 
 # Load base class first, then parser, then specific types, then registry last
-require_relative 'types/base'
-require_relative 'types/parser'
-require_relative 'types/integer'
-require_relative 'types/float'
-require_relative 'types/string'
-require_relative 'types/date_time'
-require_relative 'types/uuid'
-require_relative 'types/boolean'
-require_relative 'types/array'
-require_relative 'types/map'
-require_relative 'types/tuple'
-require_relative 'types/nullable'
-require_relative 'types/low_cardinality'
-require_relative 'types/registry'
+require_relative "types/base"
+require_relative "types/parser"
+require_relative "types/integer"
+require_relative "types/float"
+require_relative "types/decimal"
+require_relative "types/string"
+require_relative "types/date_time"
+require_relative "types/uuid"
+require_relative "types/boolean"
+require_relative "types/array"
+require_relative "types/map"
+require_relative "types/tuple"
+require_relative "types/nullable"
+require_relative "types/low_cardinality"
+require_relative "types/enum"
+require_relative "types/registry"
 
 module ClickhouseRuby
   # Type system for mapping between ClickHouse and Ruby types

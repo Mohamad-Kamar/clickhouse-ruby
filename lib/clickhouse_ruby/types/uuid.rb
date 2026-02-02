@@ -39,7 +39,7 @@ module ClickhouseRuby
       # @param value [String, nil] the UUID value
       # @return [String] the SQL literal
       def serialize(value)
-        return 'NULL' if value.nil?
+        return "NULL" if value.nil?
 
         "'#{normalize_uuid(value)}'"
       end
@@ -54,10 +54,10 @@ module ClickhouseRuby
         str = value.to_s.strip.downcase
 
         # Remove braces if present
-        str = str.gsub(/[{}]/, '')
+        str = str.gsub(/[{}]/, "")
 
         # If no hyphens, add them
-        if str.length == 32 && !str.include?('-')
+        if str.length == 32 && !str.include?("-")
           str = "#{str[0..7]}-#{str[8..11]}-#{str[12..15]}-#{str[16..19]}-#{str[20..31]}"
         end
 
@@ -76,7 +76,7 @@ module ClickhouseRuby
           "Invalid UUID format: '#{original}'",
           from_type: original.class.name,
           to_type: name,
-          value: original
+          value: original,
         )
       end
     end

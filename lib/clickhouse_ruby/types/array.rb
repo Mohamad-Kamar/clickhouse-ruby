@@ -20,7 +20,7 @@ module ClickhouseRuby
       # @param element_type [Base] the element type
       def initialize(name, element_type: nil)
         super(name)
-        @element_type = element_type || Base.new('String')
+        @element_type = element_type || Base.new("String")
       end
 
       # Converts a Ruby value to an array
@@ -41,7 +41,7 @@ module ClickhouseRuby
                   "Cannot cast #{value.class} to Array",
                   from_type: value.class.name,
                   to_type: to_s,
-                  value: value
+                  value: value,
                 )
               end
 
@@ -72,10 +72,10 @@ module ClickhouseRuby
       # @param value [Array, nil] the value to serialize
       # @return [String] the SQL literal
       def serialize(value)
-        return 'NULL' if value.nil?
+        return "NULL" if value.nil?
 
         elements = value.map { |v| @element_type.serialize(v) }
-        "[#{elements.join(', ')}]"
+        "[#{elements.join(", ")}]"
       end
 
       # Returns the full type string including element type
@@ -95,15 +95,15 @@ module ClickhouseRuby
         stripped = value.strip
 
         # Handle empty array
-        return [] if stripped == '[]'
+        return [] if stripped == "[]"
 
         # Remove outer brackets
-        unless stripped.start_with?('[') && stripped.end_with?(']')
+        unless stripped.start_with?("[") && stripped.end_with?("]")
           raise TypeCastError.new(
             "Invalid array format: '#{value}'",
-            from_type: 'String',
+            from_type: "String",
             to_type: to_s,
-            value: value
+            value: value,
           )
         end
 
@@ -120,7 +120,7 @@ module ClickhouseRuby
       # @return [Array] the parsed elements
       def parse_elements(str)
         elements = []
-        current = ''
+        current = ""
         depth = 0
         in_string = false
         escape_next = false
@@ -133,22 +133,22 @@ module ClickhouseRuby
           end
 
           case char
-          when '\\'
+          when "\\"
             escape_next = true
             current += char
           when "'"
             in_string = !in_string
             current += char
-          when '[', '('
+          when "[", "("
             depth += 1 unless in_string
             current += char
-          when ']', ')'
+          when "]", ")"
             depth -= 1 unless in_string
             current += char
-          when ','
+          when ","
             if depth.zero? && !in_string
               elements << parse_element(current.strip)
-              current = ''
+              current = ""
             else
               current += char
             end
@@ -171,7 +171,7 @@ module ClickhouseRuby
         # Remove surrounding quotes if present
         if str.start_with?("'") && str.end_with?("'")
           str[1...-1].gsub("\\'", "'")
-        elsif str.start_with?('[')
+        elsif str.start_with?("[")
           # Nested array - let the element type handle it
           str
         else

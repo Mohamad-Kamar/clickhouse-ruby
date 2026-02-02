@@ -36,7 +36,7 @@ module ClickhouseRuby
       # @param type_class [Class] the type class
       def register(name, type_class)
         @types[name] = type_class
-        @cache.clear  # Invalidate cache when types change
+        @cache.clear # Invalidate cache when types change
       end
 
       # Looks up a type by its ClickHouse type string
@@ -62,43 +62,55 @@ module ClickhouseRuby
       # Registers all default ClickHouse types
       def register_defaults
         # Integer types
-        register('Int8', Integer)
-        register('Int16', Integer)
-        register('Int32', Integer)
-        register('Int64', Integer)
-        register('Int128', Integer)
-        register('Int256', Integer)
-        register('UInt8', Integer)
-        register('UInt16', Integer)
-        register('UInt32', Integer)
-        register('UInt64', Integer)
-        register('UInt128', Integer)
-        register('UInt256', Integer)
+        register("Int8", Integer)
+        register("Int16", Integer)
+        register("Int32", Integer)
+        register("Int64", Integer)
+        register("Int128", Integer)
+        register("Int256", Integer)
+        register("UInt8", Integer)
+        register("UInt16", Integer)
+        register("UInt32", Integer)
+        register("UInt64", Integer)
+        register("UInt128", Integer)
+        register("UInt256", Integer)
 
         # Float types
-        register('Float32', Float)
-        register('Float64', Float)
+        register("Float32", Float)
+        register("Float64", Float)
+
+        # Decimal types
+        register("Decimal", Decimal)
+        register("Decimal32", Decimal)
+        register("Decimal64", Decimal)
+        register("Decimal128", Decimal)
+        register("Decimal256", Decimal)
 
         # String types
-        register('String', String)
-        register('FixedString', String)
+        register("String", String)
+        register("FixedString", String)
 
         # Date/Time types
-        register('Date', DateTime)
-        register('Date32', DateTime)
-        register('DateTime', DateTime)
-        register('DateTime64', DateTime)
+        register("Date", DateTime)
+        register("Date32", DateTime)
+        register("DateTime", DateTime)
+        register("DateTime64", DateTime)
 
         # Other basic types
-        register('UUID', UUID)
-        register('Bool', Boolean)
+        register("UUID", UUID)
+        register("Bool", Boolean)
 
         # Complex/wrapper types
-        register('Array', Array)
-        register('Map', Map)
-        register('Tuple', Tuple)
-        register('Nullable', Nullable)
-        register('LowCardinality', LowCardinality)
+        register("Array", Array)
+        register("Map", Map)
+        register("Tuple", Tuple)
+        register("Nullable", Nullable)
+        register("LowCardinality", LowCardinality)
+
+        # Enum types
+        register("Enum", Enum)
+        register("Enum8", Enum)
+        register("Enum16", Enum)
       end
 
       private
@@ -142,7 +154,6 @@ module ClickhouseRuby
           type_class.new(type_name)
         end
       end
-
     end
   end
 end

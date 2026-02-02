@@ -31,7 +31,7 @@ module ClickhouseRuby
             "Cannot cast #{value.class} to #{name}",
             from_type: value.class.name,
             to_type: name,
-            value: value
+            value: value,
           )
         end
       end
@@ -56,7 +56,7 @@ module ClickhouseRuby
             "Cannot deserialize #{value.class} to #{name}",
             from_type: value.class.name,
             to_type: name,
-            value: value
+            value: value,
           )
         end
       end
@@ -66,14 +66,14 @@ module ClickhouseRuby
       # @param value [Float, nil] the value to serialize
       # @return [String] the SQL literal
       def serialize(value)
-        return 'NULL' if value.nil?
+        return "NULL" if value.nil?
 
         if value.nan?
-          'nan'
+          "nan"
         elsif value.infinite? == 1
-          'inf'
+          "inf"
         elsif value.infinite? == -1
-          '-inf'
+          "-inf"
         else
           value.to_s
         end
@@ -91,20 +91,20 @@ module ClickhouseRuby
 
         # Handle special values
         case stripped
-        when 'inf', '+inf', 'infinity', '+infinity'
+        when "inf", "+inf", "infinity", "+infinity"
           ::Float::INFINITY
-        when '-inf', '-infinity'
+        when "-inf", "-infinity"
           -::Float::INFINITY
-        when 'nan'
+        when "nan"
           ::Float::NAN
         else
           # Handle empty strings
           if stripped.empty?
             raise TypeCastError.new(
               "Cannot cast empty string to #{name}",
-              from_type: 'String',
+              from_type: "String",
               to_type: name,
-              value: value
+              value: value,
             )
           end
 
@@ -113,9 +113,9 @@ module ClickhouseRuby
       rescue ArgumentError
         raise TypeCastError.new(
           "Cannot cast '#{value}' to #{name}",
-          from_type: 'String',
+          from_type: "String",
           to_type: name,
-          value: value
+          value: value,
         )
       end
     end

@@ -21,7 +21,7 @@ module ClickhouseRuby
       # @param element_type [Base] the wrapped type
       def initialize(name, element_type: nil)
         super(name)
-        @element_type = element_type || Base.new('String')
+        @element_type = element_type || Base.new("String")
       end
 
       # Converts a Ruby value, allowing nil
@@ -50,7 +50,7 @@ module ClickhouseRuby
       # @param value [Object, nil] the value to serialize
       # @return [String] the SQL literal
       def serialize(value)
-        return 'NULL' if value.nil?
+        return "NULL" if value.nil?
 
         @element_type.serialize(value)
       end

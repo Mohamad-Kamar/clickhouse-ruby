@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'rails/railtie'
+require "rails/railtie"
 
 module ClickhouseRuby
   module ActiveRecord
@@ -28,24 +28,25 @@ module ClickhouseRuby
     #
     class Railtie < ::Rails::Railtie
       # Initialize the adapter when ActiveRecord loads
-      initializer 'clickhouse_ruby.initialize_active_record' do
+      initializer "clickhouse_ruby.initialize_active_record" do
         # Register the adapter
         ::ActiveSupport.on_load(:active_record) do
-          require_relative 'connection_adapter'
+          require_relative "connection_adapter"
 
           # Log that the adapter is being registered
           if defined?(Rails.logger) && Rails.logger
-            Rails.logger.info '[ClickhouseRuby] ClickHouse adapter registered with ActiveRecord'
+            Rails.logger.info "[ClickhouseRuby] ClickHouse adapter registered with ActiveRecord"
           end
         end
       end
 
       # Configure database tasks (db:create, db:drop, etc.)
-      initializer 'clickhouse_ruby.configure_database_tasks' do
+      initializer "clickhouse_ruby.configure_database_tasks" do
         ::ActiveSupport.on_load(:active_record) do
           # Register ClickHouse-specific database tasks
           if defined?(::ActiveRecord::Tasks::DatabaseTasks)
-            ::ActiveRecord::Tasks::DatabaseTasks.register_task(/clickhouse/, 'ClickhouseRuby::ActiveRecord::DatabaseTasks')
+            ::ActiveRecord::Tasks::DatabaseTasks.register_task(/clickhouse/,
+                                                               "ClickhouseRuby::ActiveRecord::DatabaseTasks",)
           end
         end
       end
@@ -55,21 +56,25 @@ module ClickhouseRuby
         # Set up connection pool based on Rails configuration
         if defined?(ActiveRecord::Base)
           # Ensure connections are properly managed
-          ActiveRecord::Base.connection_pool.disconnect! rescue nil
+          begin
+            ActiveRecord::Base.connection_pool.disconnect!
+          rescue StandardError
+            nil
+          end
         end
       end
 
       # Add generators namespace for Rails generators
       generators do
-        require_relative 'generators/migration_generator' if defined?(::Rails::Generators)
+        require_relative "generators/migration_generator" if defined?(::Rails::Generators)
       end
 
       # Log deprecation warnings for known issues
-      initializer 'clickhouse_ruby.log_deprecation_warnings' do
+      initializer "clickhouse_ruby.log_deprecation_warnings" do
         ::ActiveSupport.on_load(:active_record) do
           # Warn about features that don't work with ClickHouse
           if defined?(Rails.logger) && Rails.logger
-            Rails.logger.debug '[ClickhouseRuby] Note: ClickHouse does not support transactions, savepoints, or foreign keys'
+            Rails.logger.debug "[ClickhouseRuby] Note: ClickHouse does not support transactions, savepoints, or foreign keys"
           end
         end
       end
@@ -94,7 +99,7 @@ module ClickhouseRuby
 
         # Connect without database to create it
         temp_config = config.dup
-        temp_config[:database] = 'default'
+        temp_config[:database] = "default"
 
         adapter = ConnectionAdapter.new(nil, nil, nil, temp_config)
         adapter.connect
@@ -117,7 +122,7 @@ module ClickhouseRuby
 
         # Connect without database to drop it
         temp_config = config.dup
-        temp_config[:database] = 'default'
+        temp_config[:database] = "default"
 
         adapter = ConnectionAdapter.new(nil, nil, nil, temp_config)
         adapter.connect
@@ -145,11 +150,11 @@ module ClickhouseRuby
         adapter = ConnectionAdapter.new(nil, nil, nil, config)
         adapter.connect
 
-        File.open(filename, 'w') do |file|
+        File.open(filename, "w") do |file|
           # Dump each table's CREATE statement
           adapter.tables.each do |table_name|
             result = adapter.execute("SHOW CREATE TABLE #{adapter.quote_table_name(table_name)}")
-            create_statement = result.first['statement'] || result.first['Create Table']
+            create_statement = result.first["statement"] || result.first["Create Table"]
             file.puts "#{create_statement};\n\n"
           end
         end
@@ -180,7 +185,7 @@ module ClickhouseRuby
 
       # Charset (not applicable to ClickHouse)
       def charset(_master_configuration_hash = configuration_hash)
-        'UTF-8'
+        "UTF-8"
       end
 
       # Collation (not applicable to ClickHouse)

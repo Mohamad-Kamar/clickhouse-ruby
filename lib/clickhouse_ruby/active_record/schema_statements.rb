@@ -26,8 +26,8 @@ module ClickhouseRuby
           ORDER BY name
         SQL
 
-        result = execute(sql, 'SCHEMA')
-        result.map { |row| row['name'] }
+        result = execute(sql, "SCHEMA")
+        result.map { |row| row["name"] }
       end
 
       # Returns list of views in the current database
@@ -42,8 +42,8 @@ module ClickhouseRuby
           ORDER BY name
         SQL
 
-        result = execute(sql, 'SCHEMA')
-        result.map { |row| row['name'] }
+        result = execute(sql, "SCHEMA")
+        result.map { |row| row["name"] }
       end
 
       # Check if a table exists
@@ -59,7 +59,7 @@ module ClickhouseRuby
           LIMIT 1
         SQL
 
-        result = execute(sql, 'SCHEMA')
+        result = execute(sql, "SCHEMA")
         result.any?
       end
 
@@ -77,7 +77,7 @@ module ClickhouseRuby
           LIMIT 1
         SQL
 
-        result = execute(sql, 'SCHEMA')
+        result = execute(sql, "SCHEMA")
         result.any?
       end
 
@@ -98,13 +98,13 @@ module ClickhouseRuby
           ORDER BY name
         SQL
 
-        result = execute(sql, 'SCHEMA')
+        result = execute(sql, "SCHEMA")
         result.map do |row|
           {
-            name: row['name'],
-            type: row['type'],
-            expression: row['expr'],
-            granularity: row['granularity']
+            name: row["name"],
+            type: row["type"],
+            expression: row["expr"],
+            granularity: row["granularity"],
           }
         end
       end
@@ -130,14 +130,14 @@ module ClickhouseRuby
           ORDER BY position
         SQL
 
-        result = execute(sql, 'SCHEMA')
+        result = execute(sql, "SCHEMA")
         result.map do |row|
           new_column(
-            row['name'],
-            row['default_expression'],
-            fetch_type_metadata(row['type']),
-            row['type'] =~ /^Nullable/i,
-            row['comment']
+            row["name"],
+            row["default_expression"],
+            fetch_type_metadata(row["type"]),
+            row["type"] =~ /^Nullable/i,
+            row["comment"],
           )
         end
       end
@@ -156,8 +156,8 @@ module ClickhouseRuby
           ORDER BY position
         SQL
 
-        result = execute(sql, 'SCHEMA')
-        keys = result.map { |row| row['name'] }
+        result = execute(sql, "SCHEMA")
+        keys = result.map { |row| row["name"] }
         keys.empty? ? nil : keys
       end
 
@@ -173,15 +173,13 @@ module ClickhouseRuby
       # @yield [TableDefinition] the table definition block
       # @return [void]
       # @raise [ClickhouseRuby::QueryError] on error
-      def create_table(table_name, **options, &block)
+      def create_table(table_name, **options)
         td = create_table_definition(table_name, **options)
 
-        if block_given?
-          yield td
-        end
+        yield td if block_given?
 
         sql = schema_creation.accept(td)
-        execute(sql, 'CREATE TABLE')
+        execute(sql, "CREATE TABLE")
       end
 
       # Drop a table
@@ -193,8 +191,8 @@ module ClickhouseRuby
       # @raise [ClickhouseRuby::QueryError] on error (unless if_exists: true)
       def drop_table(table_name, **options)
         if_exists = options.fetch(:if_exists, false)
-        sql = "DROP TABLE #{if_exists ? 'IF EXISTS ' : ''}#{quote_table_name(table_name)}"
-        execute(sql, 'DROP TABLE')
+        sql = "DROP TABLE #{if_exists ? "IF EXISTS " : ""}#{quote_table_name(table_name)}"
+        execute(sql, "DROP TABLE")
       end
 
       # Rename a table
@@ -205,7 +203,7 @@ module ClickhouseRuby
       # @raise [ClickhouseRuby::QueryError] on error
       def rename_table(old_name, new_name)
         sql = "RENAME TABLE #{quote_table_name(old_name)} TO #{quote_table_name(new_name)}"
-        execute(sql, 'RENAME TABLE')
+        execute(sql, "RENAME TABLE")
       end
 
       # Truncate a table (delete all data)
@@ -214,9 +212,9 @@ module ClickhouseRuby
       # @param options [Hash] truncate options
       # @return [void]
       # @raise [ClickhouseRuby::QueryError] on error
-      def truncate_table(table_name, **options)
+      def truncate_table(table_name, **_options)
         sql = "TRUNCATE TABLE #{quote_table_name(table_name)}"
-        execute(sql, 'TRUNCATE TABLE')
+        execute(sql, "TRUNCATE TABLE")
       end
 
       # Add a column to a table
@@ -234,23 +232,17 @@ module ClickhouseRuby
         sql_type = type_to_sql(type, **options)
 
         # Handle nullable
-        if options[:null] != false && !sql_type.match?(/^Nullable/i)
-          sql_type = "Nullable(#{sql_type})"
-        end
+        sql_type = "Nullable(#{sql_type})" if options[:null] != false && !sql_type.match?(/^Nullable/i)
 
         sql = "ALTER TABLE #{quote_table_name(table_name)} ADD COLUMN #{quote_column_name(column_name)} #{sql_type}"
 
         # Add AFTER clause if specified
-        if options[:after]
-          sql += " AFTER #{quote_column_name(options[:after])}"
-        end
+        sql += " AFTER #{quote_column_name(options[:after])}" if options[:after]
 
         # Add DEFAULT if specified
-        if options.key?(:default)
-          sql += " DEFAULT #{quote(options[:default])}"
-        end
+        sql += " DEFAULT #{quote(options[:default])}" if options.key?(:default)
 
-        execute(sql, 'ADD COLUMN')
+        execute(sql, "ADD COLUMN")
       end
 
       # Remove a column from a table
@@ -260,9 +252,9 @@ module ClickhouseRuby
       # @param options [Hash] options (unused)
       # @return [void]
       # @raise [ClickhouseRuby::QueryError] on error
-      def remove_column(table_name, column_name, _type = nil, **options)
+      def remove_column(table_name, column_name, _type = nil, **_options)
         sql = "ALTER TABLE #{quote_table_name(table_name)} DROP COLUMN #{quote_column_name(column_name)}"
-        execute(sql, 'DROP COLUMN')
+        execute(sql, "DROP COLUMN")
       end
 
       # Rename a column
@@ -274,7 +266,7 @@ module ClickhouseRuby
       # @raise [ClickhouseRuby::QueryError] on error
       def rename_column(table_name, old_name, new_name)
         sql = "ALTER TABLE #{quote_table_name(table_name)} RENAME COLUMN #{quote_column_name(old_name)} TO #{quote_column_name(new_name)}"
-        execute(sql, 'RENAME COLUMN')
+        execute(sql, "RENAME COLUMN")
       end
 
       # Change a column's type
@@ -289,18 +281,14 @@ module ClickhouseRuby
         sql_type = type_to_sql(type, **options)
 
         # Handle nullable
-        if options[:null] != false && !sql_type.match?(/^Nullable/i)
-          sql_type = "Nullable(#{sql_type})"
-        end
+        sql_type = "Nullable(#{sql_type})" if options[:null] != false && !sql_type.match?(/^Nullable/i)
 
         sql = "ALTER TABLE #{quote_table_name(table_name)} MODIFY COLUMN #{quote_column_name(column_name)} #{sql_type}"
 
         # Add DEFAULT if specified
-        if options.key?(:default)
-          sql += " DEFAULT #{quote(options[:default])}"
-        end
+        sql += " DEFAULT #{quote(options[:default])}" if options.key?(:default)
 
-        execute(sql, 'MODIFY COLUMN')
+        execute(sql, "MODIFY COLUMN")
       end
 
       # Add an index to a table
@@ -315,13 +303,13 @@ module ClickhouseRuby
       # @return [void]
       # @raise [ClickhouseRuby::QueryError] on error
       def add_index(table_name, column_name, **options)
-        columns = Array(column_name).map { |c| quote_column_name(c) }.join(', ')
-        index_name = options[:name] || "idx_#{Array(column_name).join('_')}"
-        index_type = options[:type] || 'minmax'
+        columns = Array(column_name).map { |c| quote_column_name(c) }.join(", ")
+        index_name = options[:name] || "idx_#{Array(column_name).join("_")}"
+        index_type = options[:type] || "minmax"
         granularity = options[:granularity] || 1
 
         sql = "ALTER TABLE #{quote_table_name(table_name)} ADD INDEX #{quote_column_name(index_name)} (#{columns}) TYPE #{index_type} GRANULARITY #{granularity}"
-        execute(sql, 'ADD INDEX')
+        execute(sql, "ADD INDEX")
       end
 
       # Remove an index from a table
@@ -336,11 +324,11 @@ module ClickhouseRuby
                      elsif options[:name]
                        options[:name]
                      else
-                       "idx_#{Array(options_or_column).join('_')}"
+                       "idx_#{Array(options_or_column).join("_")}"
                      end
 
         sql = "ALTER TABLE #{quote_table_name(table_name)} DROP INDEX #{quote_column_name(index_name)}"
-        execute(sql, 'DROP INDEX')
+        execute(sql, "DROP INDEX")
       end
 
       # Check if an index exists
@@ -358,7 +346,7 @@ module ClickhouseRuby
           LIMIT 1
         SQL
 
-        result = execute(sql, 'SCHEMA')
+        result = execute(sql, "SCHEMA")
         result.any?
       end
 
@@ -377,12 +365,12 @@ module ClickhouseRuby
           LIMIT 1
         SQL
 
-        result = execute(sql, 'SCHEMA')
+        result = execute(sql, "SCHEMA")
         return false if result.empty?
 
         if type
           # Check if type matches
-          column_type = result.first['type']
+          column_type = result.first["type"]
           expected_type = type_to_sql(type, **options)
           column_type.downcase.include?(expected_type.downcase)
         else
@@ -394,16 +382,16 @@ module ClickhouseRuby
       #
       # @return [String] the database name
       def current_database
-        result = execute('SELECT currentDatabase() AS db', 'SCHEMA')
-        result.first['db']
+        result = execute("SELECT currentDatabase() AS db", "SCHEMA")
+        result.first["db"]
       end
 
       # List all databases
       #
       # @return [Array<String>] list of database names
       def databases
-        result = execute('SELECT name FROM system.databases ORDER BY name', 'SCHEMA')
-        result.map { |row| row['name'] }
+        result = execute("SELECT name FROM system.databases ORDER BY name", "SCHEMA")
+        result.map { |row| row["name"] }
       end
 
       # Create a database
@@ -415,8 +403,8 @@ module ClickhouseRuby
       # @raise [ClickhouseRuby::QueryError] on error
       def create_database(database_name, **options)
         if_not_exists = options.fetch(:if_not_exists, false)
-        sql = "CREATE DATABASE #{if_not_exists ? 'IF NOT EXISTS ' : ''}`#{database_name}`"
-        execute(sql, 'CREATE DATABASE')
+        sql = "CREATE DATABASE #{if_not_exists ? "IF NOT EXISTS " : ""}`#{database_name}`"
+        execute(sql, "CREATE DATABASE")
       end
 
       # Drop a database
@@ -428,8 +416,8 @@ module ClickhouseRuby
       # @raise [ClickhouseRuby::QueryError] on error
       def drop_database(database_name, **options)
         if_exists = options.fetch(:if_exists, false)
-        sql = "DROP DATABASE #{if_exists ? 'IF EXISTS ' : ''}`#{database_name}`"
-        execute(sql, 'DROP DATABASE')
+        sql = "DROP DATABASE #{if_exists ? "IF EXISTS " : ""}`#{database_name}`"
+        execute(sql, "DROP DATABASE")
       end
 
       private
@@ -444,25 +432,25 @@ module ClickhouseRuby
 
         case type
         when :primary_key
-          'UInt64'
+          "UInt64"
         when :string, :text
           if options[:limit]
             "FixedString(#{options[:limit]})"
           else
-            'String'
+            "String"
           end
         when :integer
           case options[:limit]
-          when 1 then 'Int8'
-          when 2 then 'Int16'
-          when 3, 4 then 'Int32'
-          when 5, 6, 7, 8 then 'Int64'
-          else 'Int32'
+          when 1 then "Int8"
+          when 2 then "Int16"
+          when 3, 4 then "Int32"
+          when 5, 6, 7, 8 then "Int64"
+          else "Int32"
           end
         when :bigint
-          'Int64'
+          "Int64"
         when :float
-          options[:limit] == 8 ? 'Float64' : 'Float32'
+          options[:limit] == 8 ? "Float64" : "Float32"
         when :decimal
           precision = options[:precision] || 10
           scale = options[:scale] || 0
@@ -471,22 +459,22 @@ module ClickhouseRuby
           if options[:precision]
             "DateTime64(#{options[:precision]})"
           else
-            'DateTime'
+            "DateTime"
           end
         when :timestamp
           "DateTime64(#{options[:precision] || 3})"
         when :time
-          'DateTime'
+          "DateTime"
         when :date
-          'Date'
+          "Date"
         when :binary
-          'String'
+          "String"
         when :boolean
-          'UInt8'
+          "UInt8"
         when :uuid
-          'UUID'
+          "UUID"
         when :json
-          'String'
+          "String"
         else
           # Return as-is if it's a ClickHouse type
           type.to_s
@@ -507,7 +495,7 @@ module ClickhouseRuby
           default,
           sql_type_metadata,
           null,
-          comment: comment
+          comment: comment,
         )
       end
 
@@ -522,7 +510,7 @@ module ClickhouseRuby
           type: cast_type.type,
           limit: cast_type.limit,
           precision: cast_type.precision,
-          scale: cast_type.scale
+          scale: cast_type.scale,
         )
       end
 
@@ -610,7 +598,7 @@ module ClickhouseRuby
           column_sql(col)
         end.join(",\n  ")
 
-        engine = table_definition.options[:engine] || 'MergeTree'
+        engine = table_definition.options[:engine] || "MergeTree"
         order_by = table_definition.options[:order_by]
         partition_by = table_definition.options[:partition_by]
         primary_key = table_definition.options[:primary_key]
@@ -639,9 +627,7 @@ module ClickhouseRuby
         sql = "#{@adapter.quote_column_name(col[:name])} #{type}"
 
         # Add DEFAULT if specified
-        if col[:options].key?(:default)
-          sql += " DEFAULT #{@adapter.quote(col[:options][:default])}"
-        end
+        sql += " DEFAULT #{@adapter.quote(col[:options][:default])}" if col[:options].key?(:default)
 
         sql
       end
@@ -651,39 +637,39 @@ module ClickhouseRuby
 
         case type
         when :primary_key
-          'UInt64'
+          "UInt64"
         when :string, :text
-          options[:limit] ? "FixedString(#{options[:limit]})" : 'String'
+          options[:limit] ? "FixedString(#{options[:limit]})" : "String"
         when :integer
           case options[:limit]
-          when 1 then 'Int8'
-          when 2 then 'Int16'
-          when 3, 4 then 'Int32'
-          when 5, 6, 7, 8 then 'Int64'
-          else 'Int32'
+          when 1 then "Int8"
+          when 2 then "Int16"
+          when 3, 4 then "Int32"
+          when 5, 6, 7, 8 then "Int64"
+          else "Int32"
           end
         when :bigint
-          'Int64'
+          "Int64"
         when :float
-          options[:limit] == 8 ? 'Float64' : 'Float32'
+          options[:limit] == 8 ? "Float64" : "Float32"
         when :decimal
           "Decimal(#{options[:precision] || 10}, #{options[:scale] || 0})"
         when :datetime
-          options[:precision] ? "DateTime64(#{options[:precision]})" : 'DateTime'
+          options[:precision] ? "DateTime64(#{options[:precision]})" : "DateTime"
         when :timestamp
           "DateTime64(#{options[:precision] || 3})"
         when :time
-          'DateTime'
+          "DateTime"
         when :date
-          'Date'
+          "Date"
         when :binary
-          'String'
+          "String"
         when :boolean
-          'UInt8'
+          "UInt8"
         when :uuid
-          'UUID'
+          "UUID"
         when :json
-          'String'
+          "String"
         else
           type.to_s
         end

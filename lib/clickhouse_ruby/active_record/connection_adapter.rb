@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
-require 'active_record/connection_adapters/abstract_adapter'
-require_relative 'arel_visitor'
-require_relative 'schema_statements'
+require "active_record/connection_adapters/abstract_adapter"
+require_relative "arel_visitor"
+require_relative "schema_statements"
+require_relative "relation_extensions"
 
 module ClickhouseRuby
   module ActiveRecord
@@ -39,28 +40,28 @@ module ClickhouseRuby
     #   Event.where(status: 'old').delete_all  # Raises on error!
     #
     class ConnectionAdapter < ::ActiveRecord::ConnectionAdapters::AbstractAdapter
-      ADAPTER_NAME = 'Clickhouse'
+      ADAPTER_NAME = "Clickhouse"
 
       include SchemaStatements
 
       # Native database types mapping for ClickHouse
       # Used by migrations and schema definitions
       NATIVE_DATABASE_TYPES = {
-        primary_key: 'UInt64',
-        string: { name: 'String' },
-        text: { name: 'String' },
-        integer: { name: 'Int32' },
-        bigint: { name: 'Int64' },
-        float: { name: 'Float32' },
-        decimal: { name: 'Decimal', precision: 10, scale: 0 },
-        datetime: { name: 'DateTime' },
-        timestamp: { name: 'DateTime64', precision: 3 },
-        time: { name: 'DateTime' },
-        date: { name: 'Date' },
-        binary: { name: 'String' },
-        boolean: { name: 'UInt8' },
-        uuid: { name: 'UUID' },
-        json: { name: 'String' }
+        primary_key: "UInt64",
+        string: { name: "String" },
+        text: { name: "String" },
+        integer: { name: "Int32" },
+        bigint: { name: "Int64" },
+        float: { name: "Float32" },
+        decimal: { name: "Decimal", precision: 10, scale: 0 },
+        datetime: { name: "DateTime" },
+        timestamp: { name: "DateTime64", precision: 3 },
+        time: { name: "DateTime" },
+        date: { name: "Date" },
+        binary: { name: "String" },
+        boolean: { name: "UInt8" },
+        uuid: { name: "UUID" },
+        json: { name: "String" },
       }.freeze
 
       class << self
@@ -86,9 +87,9 @@ module ClickhouseRuby
         # @return [ClickhouseRuby::Configuration] configured client
         def build_clickhouse_config(config)
           ClickhouseRuby::Configuration.new.tap do |c|
-            c.host = config[:host] || 'localhost'
+            c.host = config[:host] || "localhost"
             c.port = config[:port]&.to_i || 8123
-            c.database = config[:database] || 'default'
+            c.database = config[:database] || "default"
             c.username = config[:username]
             c.password = config[:password]
             c.ssl = config[:ssl]
@@ -110,12 +111,15 @@ module ClickhouseRuby
       # @param logger [Logger] Rails logger
       # @param connection_options [Array] connection options
       # @param config [Hash] database configuration
-      def initialize(connection, logger = nil, connection_options = nil, config = {})
+      def initialize(connection, logger = nil, _connection_options = nil, config = {})
         @config = config.symbolize_keys
         @clickhouse_client = nil
         @connection_parameters = nil
 
         super(connection, logger, config)
+
+        # Extend ActiveRecord::Relation with our methods
+        ::ActiveRecord::Relation.include(RelationExtensions)
       end
 
       # Returns the adapter name
@@ -143,7 +147,7 @@ module ClickhouseRuby
         return false unless @clickhouse_client
 
         # Ping ClickHouse to verify connection
-        execute_internal('SELECT 1')
+        execute_internal("SELECT 1")
         true
       rescue ClickhouseRuby::Error
         false
@@ -322,7 +326,7 @@ module ClickhouseRuby
         raise ClickhouseRuby::QueryError.new(
           "Query execution failed: #{e.message}",
           sql: sql,
-          original_error: e
+          original_error: e,
         )
       end
 
@@ -337,7 +341,7 @@ module ClickhouseRuby
       # @param binds [Array] bind values
       # @return [Object] the id value
       # @raise [ClickhouseRuby::QueryError] on ClickHouse errors
-      def exec_insert(sql, name = nil, binds = [], pk = nil, sequence_name = nil)
+      def exec_insert(sql, name = nil, _binds = [], _pk = nil, _sequence_name = nil)
         execute(sql, name)
         # ClickHouse doesn't return inserted IDs
         # Return nil as we can't get the last insert ID
@@ -355,7 +359,7 @@ module ClickhouseRuby
       # @param binds [Array] bind values
       # @return [Integer] number of affected rows (estimated, ClickHouse doesn't return exact count)
       # @raise [ClickhouseRuby::QueryError] on ClickHouse errors - NEVER silently fails
-      def exec_delete(sql, name = nil, binds = [])
+      def exec_delete(sql, name = nil, _binds = [])
         ensure_connected!
 
         # The Arel visitor should have already converted this to
@@ -363,7 +367,7 @@ module ClickhouseRuby
         # But if it's standard DELETE, convert it here
         clickhouse_sql = convert_delete_to_alter(sql)
 
-        log(clickhouse_sql, name || 'DELETE') do
+        log(clickhouse_sql, name || "DELETE") do
           result = execute_internal(clickhouse_sql)
           # CRITICAL: Raise on any error
           raise_if_error!(result)
@@ -379,7 +383,7 @@ module ClickhouseRuby
         raise ClickhouseRuby::QueryError.new(
           "DELETE failed: #{e.message}",
           sql: sql,
-          original_error: e
+          original_error: e,
         )
       end
 
@@ -394,14 +398,14 @@ module ClickhouseRuby
       # @param binds [Array] bind values
       # @return [Integer] number of affected rows (estimated)
       # @raise [ClickhouseRuby::QueryError] on ClickHouse errors
-      def exec_update(sql, name = nil, binds = [])
+      def exec_update(sql, name = nil, _binds = [])
         ensure_connected!
 
         # The Arel visitor should have already converted this to
         # ALTER TABLE ... UPDATE ... WHERE syntax
         clickhouse_sql = convert_update_to_alter(sql)
 
-        log(clickhouse_sql, name || 'UPDATE') do
+        log(clickhouse_sql, name || "UPDATE") do
           result = execute_internal(clickhouse_sql)
           raise_if_error!(result)
 
@@ -414,7 +418,7 @@ module ClickhouseRuby
         raise ClickhouseRuby::QueryError.new(
           "UPDATE failed: #{e.message}",
           sql: sql,
-          original_error: e
+          original_error: e,
         )
       end
 
@@ -425,7 +429,7 @@ module ClickhouseRuby
       # @param binds [Array] bind values
       # @param prepare [Boolean] whether to prepare (ignored, ClickHouse doesn't support)
       # @return [ClickhouseRuby::Result] query result
-      def exec_query(sql, name = 'SQL', binds = [], prepare: false)
+      def exec_query(sql, name = "SQL", _binds = [], prepare: false)
         execute(sql, name)
       end
 
@@ -456,7 +460,7 @@ module ClickhouseRuby
       def exec_rollback_db_transaction
         # No-op: ClickHouse doesn't support transactions
         # Log a warning since rollback was requested but cannot be performed
-        @logger&.warn('ClickHouse does not support transaction rollback')
+        @logger&.warn("ClickHouse does not support transaction rollback")
       end
 
       # ========================================
@@ -469,7 +473,7 @@ module ClickhouseRuby
       # @param name [String, Symbol] the column name
       # @return [String] the quoted column name
       def quote_column_name(name)
-        "`#{name.to_s.gsub('`', '``')}`"
+        "`#{name.to_s.gsub("`", "``")}`"
       end
 
       # Quote a table name for ClickHouse
@@ -477,7 +481,7 @@ module ClickhouseRuby
       # @param name [String, Symbol] the table name
       # @return [String] the quoted table name
       def quote_table_name(name)
-        "`#{name.to_s.gsub('`', '``')}`"
+        "`#{name.to_s.gsub("`", "``")}`"
       end
 
       # Quote a string value for ClickHouse
@@ -509,58 +513,58 @@ module ClickhouseRuby
       # @return [void]
       def initialize_type_map(m = type_map)
         # Register standard types
-        register_class_with_limit m, %r{^String}i, ::ActiveRecord::Type::String
-        register_class_with_limit m, %r{^FixedString}i, ::ActiveRecord::Type::String
+        register_class_with_limit m, /^String/i, ::ActiveRecord::Type::String
+        register_class_with_limit m, /^FixedString/i, ::ActiveRecord::Type::String
 
         # Integer types
-        m.register_type %r{^Int8}i, ::ActiveRecord::Type::Integer.new(limit: 1)
-        m.register_type %r{^Int16}i, ::ActiveRecord::Type::Integer.new(limit: 2)
-        m.register_type %r{^Int32}i, ::ActiveRecord::Type::Integer.new(limit: 4)
-        m.register_type %r{^Int64}i, ::ActiveRecord::Type::Integer.new(limit: 8)
-        m.register_type %r{^UInt8}i, ::ActiveRecord::Type::Integer.new(limit: 1)
-        m.register_type %r{^UInt16}i, ::ActiveRecord::Type::Integer.new(limit: 2)
-        m.register_type %r{^UInt32}i, ::ActiveRecord::Type::Integer.new(limit: 4)
-        m.register_type %r{^UInt64}i, ::ActiveRecord::Type::Integer.new(limit: 8)
+        m.register_type(/^Int8/i, ::ActiveRecord::Type::Integer.new(limit: 1))
+        m.register_type(/^Int16/i, ::ActiveRecord::Type::Integer.new(limit: 2))
+        m.register_type(/^Int32/i, ::ActiveRecord::Type::Integer.new(limit: 4))
+        m.register_type(/^Int64/i, ::ActiveRecord::Type::Integer.new(limit: 8))
+        m.register_type(/^UInt8/i, ::ActiveRecord::Type::Integer.new(limit: 1))
+        m.register_type(/^UInt16/i, ::ActiveRecord::Type::Integer.new(limit: 2))
+        m.register_type(/^UInt32/i, ::ActiveRecord::Type::Integer.new(limit: 4))
+        m.register_type(/^UInt64/i, ::ActiveRecord::Type::Integer.new(limit: 8))
 
         # Float types
-        m.register_type %r{^Float32}i, ::ActiveRecord::Type::Float.new
-        m.register_type %r{^Float64}i, ::ActiveRecord::Type::Float.new
+        m.register_type(/^Float32/i, ::ActiveRecord::Type::Float.new)
+        m.register_type(/^Float64/i, ::ActiveRecord::Type::Float.new)
 
         # Decimal types
-        m.register_type %r{^Decimal}i, ::ActiveRecord::Type::Decimal.new
+        m.register_type(/^Decimal/i, ::ActiveRecord::Type::Decimal.new)
 
         # Date/Time types
-        m.register_type %r{^Date$}i, ::ActiveRecord::Type::Date.new
-        m.register_type %r{^DateTime}i, ::ActiveRecord::Type::DateTime.new
-        m.register_type %r{^DateTime64}i, ::ActiveRecord::Type::DateTime.new
+        m.register_type(/^Date$/i, ::ActiveRecord::Type::Date.new)
+        m.register_type(/^DateTime/i, ::ActiveRecord::Type::DateTime.new)
+        m.register_type(/^DateTime64/i, ::ActiveRecord::Type::DateTime.new)
 
         # Boolean (UInt8 with 0/1)
-        m.register_type %r{^Bool}i, ::ActiveRecord::Type::Boolean.new
+        m.register_type(/^Bool/i, ::ActiveRecord::Type::Boolean.new)
 
         # UUID
-        m.register_type %r{^UUID}i, ::ActiveRecord::Type::String.new
+        m.register_type(/^UUID/i, ::ActiveRecord::Type::String.new)
 
         # Nullable wrapper - extract inner type
-        m.register_type %r{^Nullable\((.+)\)}i do |sql_type|
-          inner_type = sql_type.match(%r{^Nullable\((.+)\)}i)[1]
+        m.register_type(/^Nullable\((.+)\)/i) do |sql_type|
+          inner_type = sql_type.match(/^Nullable\((.+)\)/i)[1]
           lookup_cast_type(inner_type)
         end
 
         # Array types
-        m.register_type %r{^Array\(}i, ::ActiveRecord::Type::String.new
+        m.register_type(/^Array\(/i, ::ActiveRecord::Type::String.new)
 
         # Map types
-        m.register_type %r{^Map\(}i, ::ActiveRecord::Type::String.new
+        m.register_type(/^Map\(/i, ::ActiveRecord::Type::String.new)
 
         # Tuple types
-        m.register_type %r{^Tuple\(}i, ::ActiveRecord::Type::String.new
+        m.register_type(/^Tuple\(/i, ::ActiveRecord::Type::String.new)
 
         # Enum types (treated as strings)
-        m.register_type %r{^Enum}i, ::ActiveRecord::Type::String.new
+        m.register_type(/^Enum/i, ::ActiveRecord::Type::String.new)
 
         # LowCardinality wrapper
-        m.register_type %r{^LowCardinality\((.+)\)}i do |sql_type|
-          inner_type = sql_type.match(%r{^LowCardinality\((.+)\)}i)[1]
+        m.register_type(/^LowCardinality\((.+)\)/i) do |sql_type|
+          inner_type = sql_type.match(/^LowCardinality\((.+)\)/i)[1]
           lookup_cast_type(inner_type)
         end
       end
@@ -573,10 +577,10 @@ module ClickhouseRuby
       def ensure_connected!
         connect unless connected?
 
-        unless @clickhouse_client
-          raise ClickhouseRuby::ConnectionNotEstablished,
-                'No connection to ClickHouse. Call connect first.'
-        end
+        return if @clickhouse_client
+
+        raise ClickhouseRuby::ConnectionNotEstablished,
+              "No connection to ClickHouse. Call connect first."
       end
 
       # Execute SQL through the ClickhouseRuby client
@@ -598,7 +602,7 @@ module ClickhouseRuby
         raise ClickhouseRuby::QueryError.new(
           result.error_message,
           code: result.error_code,
-          http_status: result.http_status
+          http_status: result.http_status,
         )
       end
 
@@ -610,22 +614,21 @@ module ClickhouseRuby
       def raise_query_error(error, sql)
         if error.is_a?(ClickhouseRuby::QueryError)
           # Re-raise with SQL if not already set
-          if error.sql.nil?
-            raise ClickhouseRuby::QueryError.new(
-              error.message,
-              code: error.code,
-              http_status: error.http_status,
-              sql: sql,
-              original_error: error.original_error
-            )
-          else
-            raise error
-          end
+          raise error unless error.sql.nil?
+
+          raise ClickhouseRuby::QueryError.new(
+            error.message,
+            code: error.code,
+            http_status: error.http_status,
+            sql: sql,
+            original_error: error.original_error,
+          )
+
         else
           raise ClickhouseRuby::QueryError.new(
             error.message,
             sql: sql,
-            original_error: error
+            original_error: error,
           )
         end
       end
@@ -705,19 +708,21 @@ module ClickhouseRuby
       # @param sql_type [String] the SQL type
       # @return [Integer, nil] the limit or nil
       def extract_limit(sql_type)
-        if (match = sql_type.match(/\((\d+)\)/))
-          match[1].to_i
-        end
+        return unless (match = sql_type.match(/\((\d+)\)/))
+
+        match[1].to_i
       end
     end
   end
 end
 
 # Register the adapter with ActiveRecord
-if defined?(::ActiveRecord::ConnectionAdapters)
-  ::ActiveRecord::ConnectionAdapters.register(
-    'clickhouse',
-    'ClickhouseRuby::ActiveRecord::ConnectionAdapter',
-    'clickhouse_ruby/active_record/connection_adapter'
-  )
+if defined?(ActiveRecord::ConnectionAdapters)
+  if ActiveRecord::ConnectionAdapters.respond_to?(:register)
+    ActiveRecord::ConnectionAdapters.register(
+      "clickhouse",
+      "ClickhouseRuby::ActiveRecord::ConnectionAdapter",
+      "clickhouse_ruby/active_record/connection_adapter",
+    )
+  end
 end

@@ -1,16 +1,15 @@
 # frozen_string_literal: true
 
-require 'active_record'
-require 'active_record/connection_adapters/abstract_adapter'
+require "active_record"
+require "active_record/connection_adapters/abstract_adapter"
 
-require_relative 'active_record/arel_visitor'
-require_relative 'active_record/schema_statements'
-require_relative 'active_record/connection_adapter'
+require_relative "active_record/arel_visitor"
+require_relative "active_record/schema_statements"
+require_relative "active_record/relation_extensions"
+require_relative "active_record/connection_adapter"
 
 # Load Railtie if Rails is available
-if defined?(Rails::Railtie)
-  require_relative 'active_record/railtie'
-end
+require_relative "active_record/railtie" if defined?(Rails::Railtie)
 
 module ClickhouseRuby
   # ActiveRecord integration for ClickHouse
@@ -83,7 +82,7 @@ module ClickhouseRuby
       def registered?
         defined?(::ActiveRecord::ConnectionAdapters) &&
           ::ActiveRecord::ConnectionAdapters.respond_to?(:resolve) &&
-          ::ActiveRecord::ConnectionAdapters.resolve('clickhouse').present?
+          ::ActiveRecord::ConnectionAdapters.resolve("clickhouse").present?
       rescue StandardError
         false
       end
@@ -94,6 +93,21 @@ module ClickhouseRuby
       def version
         ClickhouseRuby::VERSION
       end
+    end
+
+    # Base class for ClickHouse models
+    #
+    # All ClickHouse models should inherit from this class or configure
+    # the connection manually.
+    #
+    # @example
+    #   class Event < ClickhouseRuby::ActiveRecord::Base
+    #     self.table_name = 'events'
+    #   end
+    #
+    #   Event.where(user_id: 123).count
+    class Base < ::ActiveRecord::Base
+      self.abstract_class = true
     end
   end
 end
@@ -113,7 +127,7 @@ module ActiveRecord
           nil,
           logger,
           nil,
-          config
+          config,
         )
       end
     end

@@ -1,7 +1,7 @@
 # Feature: Enum Type Support
 
-> **Status:** Not Started
-> **Priority:** High (Batch 1)
+> **Status:** Implemented (v0.2.0)
+> **Priority:** Core Feature (Released)
 > **Dependencies:** None
 
 ---

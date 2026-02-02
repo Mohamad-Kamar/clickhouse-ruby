@@ -1,7 +1,7 @@
 # Feature: HTTP Compression
 
-> **Status:** Not Started
-> **Priority:** High (Batch 2)
+> **Status:** Implemented (v0.2.0)
+> **Priority:** Core Feature (Released)
 > **Dependencies:** None
 
 ---

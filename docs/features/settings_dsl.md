@@ -1,7 +1,7 @@
 # Feature: Query SETTINGS DSL
 
-> **Status:** Not Started
-> **Priority:** Medium (Batch 3)
+> **Status:** Implemented (v0.2.0)
+> **Priority:** Core Feature (Released)
 > **Dependencies:** RelationExtensions module (shared with PREWHERE, FINAL, SAMPLE)
 
 ---

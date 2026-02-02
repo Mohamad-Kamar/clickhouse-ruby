@@ -1,7 +1,7 @@
 # Feature: PREWHERE Support
 
-> **Status:** Not Started
-> **Priority:** High (Batch 3) - Most requested feature
+> **Status:** Implemented (v0.2.0)
+> **Priority:** Core Feature (Released)
 > **Dependencies:** RelationExtensions module (shared with FINAL, SAMPLE, SETTINGS)
 
 ---

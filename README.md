@@ -98,10 +98,15 @@ client = ClickhouseRuby.client
 | `password` | Authentication password | `nil` |
 | `ssl` | Enable HTTPS | `false` |
 | `ssl_verify` | Verify SSL certificates | `true` |
+| `ssl_ca_path` | Custom CA certificate file path | `nil` |
 | `connect_timeout` | Connection timeout in seconds | `10` |
 | `read_timeout` | Read timeout in seconds | `60` |
 | `write_timeout` | Write timeout in seconds | `60` |
 | `pool_size` | Connection pool size | `5` |
+| `log_level` | Logger level (`:debug`, `:info`, `:warn`, `:error`) | `:info` |
+| `default_settings` | Global ClickHouse settings for all queries | `{}` |
+| `pool_timeout` | Wait time for available connection in seconds | `5` |
+| `retry_jitter` | Jitter strategy (`:full`, `:equal`, `:none`) | `:equal` |
 
 ### Environment Variables
 
@@ -180,6 +185,39 @@ result = client.execute(
 )
 ```
 
+### Result Metadata
+
+Access query metadata and result information:
+
+```ruby
+result = client.execute('SELECT * FROM events LIMIT 100')
+
+# Query execution metadata
+result.elapsed_time    # => 0.042 (seconds)
+result.rows_read       # => 100
+result.bytes_read      # => 8500
+result.rows_written    # => 0 (for SELECT queries)
+result.bytes_written   # => 0
+
+# Result size information
+result.count           # => 100 (alias for size/length)
+result.size            # => 100
+result.length          # => 100
+
+# Column information
+result.columns         # => ["id", "event_type", "count"]
+result.column_types    # => ["UInt64", "String", "UInt32"]
+result.types           # => ["UInt64", "String", "UInt32"]
+
+# Row access methods
+result.first           # => {"id" => 1, "event_type" => "click", "count" => 100}
+result.last            # => {"id" => 100, "event_type" => "view", "count" => 50}
+result[5]              # => {"id" => 5, "event_type" => "click", "count" => 75}
+
+# Get all values for a specific column
+result.column_values("event_type")  # => ["click", "view", "click", ...]
+```
+
 ### DDL Commands
 
 ```ruby
@@ -220,11 +258,87 @@ client.ping # => true
 client.server_version # => "24.1.1.123"
 
 # Get pool statistics
-client.pool_stats # => { size: 5, available: 5, in_use: 0 }
+client.pool_stats # => {
+#   size: 5,                    # Total pool capacity
+#   available: 4,               # Connections ready to use
+#   in_use: 1,                  # Connections currently in use
+#   total_connections: 5,       # Total connections created
+#   total_checkouts: 150,       # Lifetime pool checkout count
+#   total_timeouts: 0,          # Timeouts waiting for connection
+#   uptime_seconds: 3600.5      # Seconds since pool created
+# }
 
 # Close all connections
 client.close
 ```
+
+### Advanced Client Methods
+
+#### Batch Processing
+
+Process large query results in batches to manage memory efficiently:
+
+```ruby
+# Process 500 rows at a time
+client.each_batch('SELECT * FROM huge_table', batch_size: 500) do |batch|
+  # batch is an array of hashes (max 500 rows)
+  puts "Processing batch of #{batch.size} rows"
+  insert_to_cache(batch)
+end
+
+# Default batch size is 500 rows
+client.each_batch('SELECT * FROM data') { |batch| process(batch) }
+```
+
+#### Row-by-Row Processing
+
+Process results one row at a time for maximum memory efficiency:
+
+```ruby
+# Stream processing - constant memory usage
+client.each_row('SELECT * FROM massive_table') do |row|
+  # row is a single hash
+  puts "Processing: #{row['id']}"
+  update_statistics(row)
+end
+
+# Returns Enumerator if no block given
+rows = client.each_row('SELECT * FROM table')
+rows.each { |row| puts row['name'] }
+```
+
+#### Connection Aliases
+
+Additional connection management methods:
+
+```ruby
+# Disconnect all connections in the pool
+client.disconnect
+
+# Check if client is connected
+client.connected?  # => true
+```
+
+#### Module-Level Methods
+
+Quick access without explicit client instance:
+
+```ruby
+# Execute query using default client
+result = ClickhouseRuby.execute('SELECT 1 AS num')
+
+# Insert data using default client
+ClickhouseRuby.insert('events', [
+  { date: '2024-01-01', event_type: 'click' }
+])
+
+# Ping default client
+ClickhouseRuby.ping  # => true
+```
+
+**Performance Note**: Batch and row-by-row processing methods use result streaming internally,
+which maintains constant memory usage regardless of result size. Use these methods for queries
+that return millions of rows to prevent memory exhaustion.
 
 ## Type Support
 

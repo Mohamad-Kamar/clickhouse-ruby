@@ -130,7 +130,7 @@ Event.sample(1.0)  # SAMPLE 1.0 (fractional = 100%)
 ```ruby
 # Pre-filter before reading all columns
 Event.prewhere(date: Date.today).where(status: 'active')
-# SELECT * FROM events PREWHERE date = '2024-02-02' WHERE status = 'active'
+# SELECT * FROM events PREWHERE date = TODAY() WHERE status = 'active'
 
 # String conditions with placeholders
 Event.prewhere('date > ?', 1.day.ago).where(active: true)
@@ -226,6 +226,11 @@ ClickhouseRuby.configure do |config|
   config.max_backoff = 120.0          # Max backoff time (default 120)
   config.retry_jitter = :equal        # Jitter strategy (default :equal)
 end
+
+# Jitter strategies for retry_jitter configuration:
+# - :full    Random between 0 and calculated delay (high variance, prevents thundering herd)
+# - :equal   Half fixed + half random (default, balanced approach)
+# - :none    Pure exponential backoff without randomization
 
 # Retries automatically on:
 # - ConnectionError (network issues)

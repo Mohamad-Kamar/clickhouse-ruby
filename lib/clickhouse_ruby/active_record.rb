@@ -7,6 +7,7 @@ require_relative "active_record/arel_visitor"
 require_relative "active_record/schema_statements"
 require_relative "active_record/relation_extensions"
 require_relative "active_record/connection_adapter"
+require_relative "active_record/schema_dumper"
 
 # Load Railtie if Rails is available
 require_relative "active_record/railtie" if defined?(Rails::Railtie)

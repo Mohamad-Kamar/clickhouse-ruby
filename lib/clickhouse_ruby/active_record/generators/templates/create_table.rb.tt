@@ -1,0 +1,59 @@
+# frozen_string_literal: true
+
+class <%= class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+  def change
+    create_table :<%= table_name %>, **clickhouse_options do |t|
+<%- attributes.each do |attribute| -%>
+<%- if attribute.type == :references -%>
+      t.bigint :<%= attribute.name %>_id<%= attribute.has_index? ? ", index: true" : "" %>
+<%- else -%>
+      t.<%= attribute.type %> :<%= attribute.name %>
+<%- end -%>
+<%- end -%>
+<%- if attributes.empty? -%>
+      t.uuid :id
+<%- end -%>
+      t.timestamps
+    end
+  end
+
+  private
+
+  # ClickHouse-specific table options
+  #
+  # MergeTree Engine Family:
+  # - MergeTree: Basic engine, good for general analytics
+  # - ReplacingMergeTree: Deduplicates rows by ORDER BY key
+  # - SummingMergeTree: Automatically sums numeric columns
+  # - AggregatingMergeTree: Stores pre-aggregated states
+  # - CollapsingMergeTree: Supports row collapsing with sign column
+  #
+  # ORDER BY:
+  # - Determines physical data sorting
+  # - First columns should be most frequently filtered
+  # - Affects compression and query performance
+  #
+  # PARTITION BY:
+  # - Usually partition by date (toYYYYMM, toYYYYMMDD)
+  # - Enables efficient data retention and queries
+  # - Don't over-partition (thousands of partitions is too many)
+  #
+  # @return [Hash] ClickHouse table options
+  def clickhouse_options
+    {
+      engine: "<%= engine_with_cluster %>",
+<%- if order_by_clause -%>
+      order_by: "<%= order_by_clause %>",
+<%- end -%>
+<%- if partition_by_clause -%>
+      partition_by: "<%= partition_by_clause %>",
+<%- end -%>
+<%- if primary_key_clause -%>
+      primary_key: "<%= primary_key_clause %>",
+<%- end -%>
+<%- if settings_clause -%>
+      settings: "<%= settings_clause %>",
+<%- end -%>
+    }
+  end
+end

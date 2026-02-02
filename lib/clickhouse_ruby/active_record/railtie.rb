@@ -8,6 +8,8 @@ module ClickhouseRuby
     #
     # This Railtie hooks into Rails to:
     # - Register the ClickHouse adapter with ActiveRecord
+    # - Register the ClickHouse migration generator
+    # - Register the ClickHouse schema dumper
     # - Configure default settings for Rails environments
     # - Set up logging integration
     #
@@ -25,6 +27,10 @@ module ClickhouseRuby
     #     database: myapp_production
     #     ssl: true
     #     ssl_verify: true
+    #
+    # @example Generate a ClickHouse migration
+    #   rails generate clickhouse:migration CreateEvents user_id:integer name:string
+    #   rails generate clickhouse:migration CreateEvents --engine=ReplacingMergeTree --order-by=user_id
     #
     class Railtie < ::Rails::Railtie
       # Initialize the adapter when ActiveRecord loads
@@ -51,6 +57,13 @@ module ClickhouseRuby
         end
       end
 
+      # Load the schema dumper when ActiveRecord loads
+      initializer "clickhouse_ruby.load_schema_dumper" do
+        ::ActiveSupport.on_load(:active_record) do
+          require_relative "schema_dumper"
+        end
+      end
+
       # Configure the connection pool for Rails
       config.after_initialize do
         # Set up connection pool based on Rails configuration
@@ -66,7 +79,7 @@ module ClickhouseRuby
 
       # Add generators namespace for Rails generators
       generators do
-        require_relative "generators/migration_generator" if defined?(::Rails::Generators)
+        require_relative "generators/migration_generator"
       end
 
       # Log deprecation warnings for known issues
@@ -74,7 +87,8 @@ module ClickhouseRuby
         ::ActiveSupport.on_load(:active_record) do
           # Warn about features that don't work with ClickHouse
           if defined?(Rails.logger) && Rails.logger
-            Rails.logger.debug "[ClickhouseRuby] Note: ClickHouse does not support transactions, savepoints, or foreign keys"
+            Rails.logger.debug "[ClickhouseRuby] Note: ClickHouse does not support " \
+                               "transactions, savepoints, or foreign keys"
           end
         end
       end

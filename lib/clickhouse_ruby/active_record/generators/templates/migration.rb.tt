@@ -1,0 +1,87 @@
+# frozen_string_literal: true
+
+class <%= class_name %> < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+<%- if @migration_action == :create_table -%>
+  def change
+    create_table :<%= table_name %>, **clickhouse_options do |t|
+<%- attributes.each do |attribute| -%>
+<%- if attribute.type == :references -%>
+      t.bigint :<%= attribute.name %>_id<%= attribute.has_index? ? ", index: true" : "" %>
+<%- else -%>
+      t.<%= attribute.type %> :<%= attribute.name %>
+<%- end -%>
+<%- end -%>
+<%- if attributes.empty? -%>
+      t.uuid :id
+<%- end -%>
+      t.timestamps
+    end
+  end
+
+  private
+
+  # ClickHouse-specific table options
+  #
+  # Customize these options based on your data patterns:
+  # - engine: Table engine (MergeTree family for analytics)
+  # - order_by: Determines data sorting and query performance
+  # - partition_by: Data partitioning for faster queries and easier maintenance
+  # - primary_key: Sparse index for faster lookups (defaults to order_by)
+  #
+  # @return [Hash] ClickHouse table options
+  def clickhouse_options
+    {
+      engine: "<%= engine_with_cluster %>",
+<%- if order_by_clause -%>
+      order_by: "<%= order_by_clause %>",
+<%- end -%>
+<%- if partition_by_clause -%>
+      partition_by: "<%= partition_by_clause %>",
+<%- end -%>
+<%- if primary_key_clause -%>
+      primary_key: "<%= primary_key_clause %>",
+<%- end -%>
+<%- if settings_clause -%>
+      settings: "<%= settings_clause %>",
+<%- end -%>
+    }
+  end
+<%- elsif @migration_action == :add_column -%>
+  def change
+<%- attributes.each do |attribute| -%>
+    add_column :<%= table_name %>, :<%= attribute.name %>, :<%= attribute.type %>
+<%- end -%>
+<%- if attributes.empty? && column_name -%>
+    add_column :<%= table_name %>, :<%= column_name %>, :string
+<%- end -%>
+  end
+<%- elsif @migration_action == :remove_column -%>
+  def change
+<%- attributes.each do |attribute| -%>
+    remove_column :<%= table_name %>, :<%= attribute.name %>, :<%= attribute.type %>
+<%- end -%>
+<%- if attributes.empty? && column_name -%>
+    # Note: Specify the column type for reversible migration
+    remove_column :<%= table_name %>, :<%= column_name %>, :string
+<%- end -%>
+  end
+<%- else -%>
+  def up
+    # Add your ClickHouse migration code here
+    # Example:
+    # execute <<~SQL
+    #   ALTER TABLE <%= table_name %>
+    #   ADD COLUMN new_column String
+    # SQL
+  end
+
+  def down
+    # Reverse the migration
+    # Example:
+    # execute <<~SQL
+    #   ALTER TABLE <%= table_name %>
+    #   DROP COLUMN new_column
+    # SQL
+  end
+<%- end -%>
+end

@@ -51,12 +51,7 @@ module ClickhouseRuby
           # Unix timestamp
           date_only? ? Time.at(value).to_date : Time.at(value)
         else
-          raise TypeCastError.new(
-            "Cannot cast #{value.class} to #{name}",
-            from_type: value.class.name,
-            to_type: name,
-            value: value,
-          )
+          raise_cast_error(value)
         end
       end
 
@@ -110,14 +105,7 @@ module ClickhouseRuby
       def parse_string(value)
         stripped = value.strip
 
-        if stripped.empty?
-          raise TypeCastError.new(
-            "Cannot cast empty string to #{name}",
-            from_type: "String",
-            to_type: name,
-            value: value,
-          )
-        end
+        raise_empty_string_error(value) if stripped.empty?
 
         if date_only?
           ::Date.parse(stripped)
@@ -125,12 +113,7 @@ module ClickhouseRuby
           ::Time.parse(stripped)
         end
       rescue ArgumentError => e
-        raise TypeCastError.new(
-          "Cannot cast '#{value}' to #{name}: #{e.message}",
-          from_type: "String",
-          to_type: name,
-          value: value,
-        )
+        raise_cast_error(value, "Cannot cast '#{value}' to #{name}: #{e.message}")
       end
 
       # Formats a date value for SQL

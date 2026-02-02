@@ -42,12 +42,7 @@ module ClickhouseRuby
                when ::String
                  parse_map_string(value)
                else
-                 raise TypeCastError.new(
-                   "Cannot cast #{value.class} to Map",
-                   from_type: value.class.name,
-                   to_type: to_s,
-                   value: value,
-                 )
+                 raise_cast_error(value, "Cannot cast #{value.class} to Map")
                end
 
         hash.transform_keys { |k| @key_type.cast(k) }
@@ -109,12 +104,7 @@ module ClickhouseRuby
 
         # Remove outer braces
         unless stripped.start_with?("{") && stripped.end_with?("}")
-          raise TypeCastError.new(
-            "Invalid map format: '#{value}'",
-            from_type: "String",
-            to_type: to_s,
-            value: value,
-          )
+          raise_format_error(value, "map")
         end
 
         inner = stripped[1...-1]
@@ -186,12 +176,7 @@ module ClickhouseRuby
         colon_idx = find_separator(str, ":")
 
         if colon_idx.nil?
-          raise TypeCastError.new(
-            "Invalid map pair format: '#{str}'",
-            from_type: "String",
-            to_type: to_s,
-            value: str,
-          )
+          raise_format_error(str, "map pair")
         end
 
         key = parse_value(str[0...colon_idx].strip)

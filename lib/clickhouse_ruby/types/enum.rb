@@ -47,12 +47,7 @@ module ClickhouseRuby
           validate_int_value!(value)
           @int_to_value[value]
         else
-          raise TypeCastError.new(
-            "Cannot cast #{value.class} to #{self}",
-            from_type: value.class.name,
-            to_type: to_s,
-            value: value,
-          )
+          raise_cast_error(value, "Cannot cast #{value.class} to #{self}")
         end
       end
 
@@ -250,12 +245,7 @@ module ClickhouseRuby
       def validate_string_value!(value)
         return if @possible_values.include?(value)
 
-        raise TypeCastError.new(
-          "Unknown enum value '#{value}'. Valid values: #{@possible_values.join(", ")}",
-          from_type: "String",
-          to_type: to_s,
-          value: value,
-        )
+        raise_cast_error(value, "Unknown enum value '#{value}'. Valid values: #{@possible_values.join(", ")}")
       end
 
       # Validates that an integer value maps to a valid enum value
@@ -265,12 +255,7 @@ module ClickhouseRuby
       def validate_int_value!(value)
         return if @int_to_value.key?(value)
 
-        raise TypeCastError.new(
-          "Unknown enum integer #{value}. Valid integers: #{@int_to_value.keys.join(", ")}",
-          from_type: "Integer",
-          to_type: to_s,
-          value: value,
-        )
+        raise_cast_error(value, "Unknown enum integer #{value}. Valid integers: #{@int_to_value.keys.join(", ")}")
       end
     end
   end

@@ -27,12 +27,7 @@ module ClickhouseRuby
         when ::BigDecimal
           value.to_f
         else
-          raise TypeCastError.new(
-            "Cannot cast #{value.class} to #{name}",
-            from_type: value.class.name,
-            to_type: name,
-            value: value,
-          )
+          raise_cast_error(value)
         end
       end
 
@@ -52,12 +47,7 @@ module ClickhouseRuby
         when ::Integer, ::BigDecimal, ::Rational
           value.to_f
         else
-          raise TypeCastError.new(
-            "Cannot deserialize #{value.class} to #{name}",
-            from_type: value.class.name,
-            to_type: name,
-            value: value,
-          )
+          raise_cast_error(value, "Cannot deserialize #{value.class} to #{name}")
         end
       end
 
@@ -99,24 +89,12 @@ module ClickhouseRuby
           ::Float::NAN
         else
           # Handle empty strings
-          if stripped.empty?
-            raise TypeCastError.new(
-              "Cannot cast empty string to #{name}",
-              from_type: "String",
-              to_type: name,
-              value: value,
-            )
-          end
+          raise_empty_string_error(value) if stripped.empty?
 
           Float(stripped)
         end
       rescue ArgumentError
-        raise TypeCastError.new(
-          "Cannot cast '#{value}' to #{name}",
-          from_type: "String",
-          to_type: name,
-          value: value,
-        )
+        raise_cast_error(value, "Cannot cast '#{value}' to #{name}")
       end
     end
   end

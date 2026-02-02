@@ -52,12 +52,7 @@ module ClickhouseRuby
         when false
           0
         else
-          raise TypeCastError.new(
-            "Cannot cast #{value.class} to #{name}",
-            from_type: value.class.name,
-            to_type: name,
-            value: value,
-          )
+          raise_cast_error(value)
         end
       end
 
@@ -115,24 +110,12 @@ module ClickhouseRuby
         stripped = value.strip
 
         # Handle empty strings
-        if stripped.empty?
-          raise TypeCastError.new(
-            "Cannot cast empty string to #{name}",
-            from_type: "String",
-            to_type: name,
-            value: value,
-          )
-        end
+        raise_empty_string_error(value) if stripped.empty?
 
         # Use Integer() for strict parsing
         Integer(stripped)
       rescue ArgumentError
-        raise TypeCastError.new(
-          "Cannot cast '#{value}' to #{name}",
-          from_type: "String",
-          to_type: name,
-          value: value,
-        )
+        raise_cast_error(value, "Cannot cast '#{value}' to #{name}")
       end
 
       # Validates that a value is within the type's range
@@ -145,12 +128,7 @@ module ClickhouseRuby
 
         return unless value < limits[:min] || value > limits[:max]
 
-        raise TypeCastError.new(
-          "Value #{value} is out of range for #{name} (#{limits[:min]}..#{limits[:max]})",
-          from_type: value.class.name,
-          to_type: name,
-          value: value,
-        )
+        raise_range_error(value, limits[:min], limits[:max])
       end
     end
   end

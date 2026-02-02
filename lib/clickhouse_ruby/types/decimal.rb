@@ -55,12 +55,7 @@ module ClickhouseRuby
              when ::String
                BigDecimal(value)
              else
-               raise TypeCastError.new(
-                 "Cannot cast #{value.class} to #{name}",
-                 from_type: value.class.name,
-                 to_type: name,
-                 value: value,
-               )
+               raise_cast_error(value)
              end
 
         validate_value!(bd)
@@ -171,12 +166,7 @@ module ClickhouseRuby
 
         return unless integer_digits.length > max_integer_digits
 
-        raise TypeCastError.new(
-          "Value #{bd} exceeds maximum integer digits (#{max_integer_digits}) for #{name}",
-          from_type: "BigDecimal",
-          to_type: name,
-          value: bd,
-        )
+        raise_cast_error(bd, "Value #{bd} exceeds maximum integer digits (#{max_integer_digits}) for #{name}")
       end
     end
   end

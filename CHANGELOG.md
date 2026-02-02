@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-02
+
+### Added
+
+#### ActiveRecord Query Extensions
+- **FINAL modifier** - Deduplication support for ReplacingMergeTree and CollapsingMergeTree tables
+  - Methods: `final`, `final!`, `final?`, `unscope_final`
+  - Auto-adds required settings when combined with PREWHERE
+  - Example: `User.final.where(id: 123)`
+
+- **SAMPLE clause** - Approximate queries on large datasets for performance
+  - Methods: `sample(ratio_or_rows, offset: nil)`, `sample!`, `sample_value`, `sample_offset`
+  - Supports fractional sampling (0.1 = 10%) and absolute row counts
+  - Preserves Integer vs Float distinction (1 = "at least 1 row", 1.0 = "100% of data")
+  - Example: `Event.sample(0.1).count`
+
+- **PREWHERE clause** - Query optimization that filters before reading all columns
+  - Methods: `prewhere(opts)`, `prewhere!`, `prewhere_values`, `prewhere.not(...)`
+  - Supports hash conditions, string conditions with placeholders, ranges, and Arel nodes
+  - Automatically optimized by ClickHouse when enabled
+  - Example: `Event.prewhere(date: Date.today).where(status: 'active')`
+
+- **SETTINGS DSL** - Per-query ClickHouse configuration
+  - Methods: `settings(opts)`, `settings!`, `query_settings`
+  - Normalizes boolean values (true/false → 1/0)
+  - Quotes string values automatically
+  - Example: `Event.settings(max_threads: 4, async_insert: true).all`
+
+#### Internal Improvements
+- Arel visitor integration for ClickHouse-specific SQL clauses
+- Proper SQL clause ordering: SELECT FROM [FINAL] [SAMPLE] [PREWHERE] [WHERE] [GROUP BY] [ORDER BY] [LIMIT] [SETTINGS]
+- RelationExtensions#build_arel override to attach ClickHouse state to Arel AST
+
+#### Type System Extensions
+- **Enum Type** - Support for Enum8 and Enum16 with string-to-integer mapping
+  - Methods: `cast`, `serialize`, `deserialize`
+  - Validation of enum values
+  - Example: `field_type = :Enum8` with values mapped via schema
+
+- **Decimal Type** - Arbitrary precision decimal support via BigDecimal
+  - Auto-mapping to Decimal32/64/128/256 based on precision
+  - Example: `field_type = :Decimal` with precision and scale
+
+#### Reliability Improvements
+- **Retry Logic** - Exponential backoff with jitter for transient failures
+  - Default: 1.6x multiplier, up to 120 seconds max backoff
+  - Configurable via `initial_backoff`, `backoff_multiplier`, `max_backoff`, `max_retries`
+  - Only retries transient errors (ConnectionError, Timeout, HTTP 5xx/429)
+  - Non-retriable: QueryError (syntax errors), HTTP 4xx
+
+- **Result Streaming** - Memory-efficient processing of large result sets
+  - Method: `stream_execute(sql) { |row| ... }`
+  - Yields rows one at a time using JSONEachRow format
+  - Constant memory usage regardless of result size
+  - Example: `client.stream_execute('SELECT * FROM huge_table') { |row| process(row) }`
+
+#### Performance Improvements
+- **HTTP Compression** - gzip compression for request/response
+  - Configuration: `compression: 'gzip'`, `compression_threshold: 1024`
+  - Built-in Zlib support (no external dependencies)
+  - Headers: `Content-Encoding: gzip`, `Accept-Encoding: gzip`
+  - Beneficial for large payloads (>1MB)
+
+### Changed
+- ActiveRecord relation extension architecture for better feature organization
+- Improved documentation with examples for all new features
+
+### Known Limitations
+- PREWHERE doesn't work with multiple JOINs (ClickHouse limitation)
+- SAMPLE requires table created with SAMPLE BY clause
+- Streaming cannot be used with FINAL or aggregate functions
+- HTTP compression has overhead for small payloads
+
 ## [0.1.0] - 2026-01-31
 
 ### Added

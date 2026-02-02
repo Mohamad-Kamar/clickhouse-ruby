@@ -6,6 +6,33 @@
 
 A lightweight Ruby client for ClickHouse with optional ActiveRecord integration.
 
+## Why ClickhouseRuby?
+
+ClickhouseRuby is designed from the ground up with production reliability and developer experience in mind. Here's what sets it apart:
+
+**🔒 Security & Reliability**
+- **SSL verification enabled by default** - Secure by default, unlike alternatives that require explicit configuration
+- **Never silently fails** - All errors are properly raised and propagated (fixes [clickhouse-activerecord #230](https://github.com/patrikx3/clickhouse-activerecord/issues/230))
+- **Comprehensive error hierarchy** - 30+ specific error classes mapped from ClickHouse error codes
+
+**⚡ Performance & Architecture**
+- **Zero runtime dependencies** - Uses only Ruby stdlib, making it lightweight and fully auditable
+- **AST-based type parser** - Handles complex nested types correctly (Array(Tuple(String, UInt64)), etc.) unlike regex-based parsers
+- **Thread-safe connection pooling** - Built-in pool with health checks and proper resource management
+- **Result streaming** - Process millions of rows with constant memory usage
+
+**🛠️ Developer Experience**
+- **Clean, intuitive API** - Simple methods for queries, inserts, and DDL operations
+- **Optional ActiveRecord integration** - Familiar model-based access when you need it
+- **ClickHouse-specific query extensions** - PREWHERE, FINAL, SAMPLE, and SETTINGS DSL built-in
+- **Comprehensive type system** - Full support for all ClickHouse types including Nullable, Array, Map, Tuple, Enum, Decimal
+
+**📊 Production Ready**
+- **Automatic retries** - Configurable exponential backoff for transient failures
+- **HTTP compression** - Reduce bandwidth for large payloads
+- **Connection health monitoring** - Pool statistics and health checks
+- **Extensive test coverage** - 80%+ coverage with both unit and integration tests
+
 ## Features
 
 **Core (v0.1.0)**

@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-02
+
+### Added
+
+#### Observability & Instrumentation
+- **ActiveSupport::Notifications Integration** - Event-driven monitoring for APM tools
+  - Events: `clickhouse_ruby.query.complete`, `clickhouse_ruby.query.error`, `clickhouse_ruby.insert.complete`
+  - Pool events: `clickhouse_ruby.pool.checkout`, `clickhouse_ruby.pool.checkin`, `clickhouse_ruby.pool.timeout`
+  - Graceful fallback when ActiveSupport is not available
+  - Query timing with millisecond precision using monotonic clock
+  - Example: `ActiveSupport::Notifications.subscribe(/clickhouse_ruby/) { |*args| ... }`
+
+- **Enhanced Logging** - Debug-level query timing logs
+  - Query duration logging at debug level
+  - Insert timing with row count
+  - Structured payload data for external processing
+
+#### Performance Benchmarking
+- **Benchmark Suite** - Comprehensive performance testing infrastructure
+  - Rake tasks: `rake benchmark`, `rake benchmark:quick`, `rake benchmark:connection`, `rake benchmark:query`, `rake benchmark:insert`
+  - Uses `benchmark-ips` for iterations-per-second measurements
+  - Performance targets from MVP: Connection <100ms, SELECT <50ms, 10K INSERT <1s
+  - Latency statistics: min, max, avg, median, p95, p99
+
+#### ActiveRecord Migration Helpers
+- **Migration Generator** - Rails generator for ClickHouse migrations
+  - Command: `rails generate clickhouse:migration CreateEvents field:type`
+  - ClickHouse-specific options: `--engine`, `--order-by`, `--partition-by`, `--primary-key`, `--settings`
+  - Cluster support with automatic Replicated* engine selection
+  - Auto-detects migration action from name (create_table, add_column, remove_column)
+
+- **Migration Templates** - ClickHouse-aware migration templates
+  - Supports MergeTree, ReplacingMergeTree, SummingMergeTree, AggregatingMergeTree
+  - Partition expressions with proper quoting
+  - Settings block support
+
+- **Schema Dumper** - Rails-compatible schema dumping
+  - Extracts table options from system.tables
+  - Dumps ClickHouse-specific column options (Nullable, LowCardinality, Decimal, DateTime64)
+  - View and index dumping support
+
+#### Query Tools
+- **EXPLAIN Support** - Query plan analysis
+  - Methods: `client.explain(sql, type: :plan)`
+  - Types: `:plan`, `:pipeline`, `:estimate`, `:ast`, `:syntax`
+  - Example: `client.explain('SELECT * FROM events', type: :pipeline)`
+
+- **Enhanced Health Check** - Comprehensive server health status
+  - Returns: status, server_version, current_database, server_uptime, pool health
+  - Single method for monitoring dashboards
+  - Example: `client.health_check`
+
+- **Detailed Pool Statistics** - Monitoring-ready metrics
+  - Method: `pool.detailed_stats`
+  - Returns: utilization_percent, checkout rate per minute, timeout rate
+  - Suitable for Prometheus/StatsD export
+
+### Changed
+- Connection pool now publishes instrumentation events on checkout/checkin
+- Query and insert operations track timing automatically
+- Pool timeout errors include instrumentation payload
+
+### Development
+- Added `benchmark-ips` (~> 2.12) as development dependency
+- New `benchmark/` directory with helper and benchmark files
+- RuboCop exclusions for benchmark files
+
 ## [0.2.0] - 2026-02-02
 
 ### Added

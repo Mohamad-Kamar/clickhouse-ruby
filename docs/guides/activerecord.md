@@ -68,6 +68,83 @@ Notes:
 
 The adapter implements `create_table`, `add_column`, `change_column`, `rename_column`, `add_index`, and related schema helpers. MergeTree tables require an engine and an `ORDER BY`.
 
+### Migration Generator (v0.3.0+)
+
+ClickhouseRuby provides a Rails generator for creating ClickHouse migrations with ClickHouse-specific options:
+
+```bash
+# Generate a migration
+rails generate clickhouse:migration CreateEvents
+
+# Generate with columns
+rails generate clickhouse:migration CreateEvents user_id:integer name:string created_at:datetime
+
+# Generate with ClickHouse options
+rails generate clickhouse:migration CreateEvents \
+  user_id:integer \
+  name:string \
+  --engine=ReplacingMergeTree \
+  --order-by=user_id \
+  --partition-by="toYYYYMM(created_at)" \
+  --primary-key=user_id \
+  --settings="index_granularity=8192"
+```
+
+**Generator Options:**
+
+- `--engine` - ClickHouse table engine (default: `MergeTree`)
+  - Valid engines: `MergeTree`, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`, `Log`, `TinyLog`, `StripeLog`, `Memory`, `Null`, `Set`, `Join`, `Buffer`, `Distributed`, `MaterializedView`, `Dictionary`
+- `--order-by` - ORDER BY clause for MergeTree family engines
+- `--partition-by` - PARTITION BY clause for data partitioning
+- `--primary-key` - PRIMARY KEY clause (defaults to ORDER BY if not specified)
+- `--settings` - Table SETTINGS clause
+- `--cluster` - Cluster name for distributed tables (automatically uses Replicated* engine)
+
+**Examples:**
+
+```bash
+# Create table with ReplacingMergeTree
+rails generate clickhouse:migration CreateUsers \
+  id:uuid \
+  email:string \
+  status:string \
+  --engine=ReplacingMergeTree \
+  --order-by=id
+
+# Create partitioned table
+rails generate clickhouse:migration CreateEvents \
+  id:uuid \
+  event_type:string \
+  created_at:datetime \
+  --engine=MergeTree \
+  --order-by="(event_type, created_at)" \
+  --partition-by="toYYYYMM(created_at)"
+
+# Create distributed table
+rails generate clickhouse:migration CreateDistributedEvents \
+  id:uuid \
+  data:string \
+  --engine=MergeTree \
+  --order-by=id \
+  --cluster=my_cluster
+
+# Add column migration
+rails generate clickhouse:migration AddStatusToUsers status:string
+
+# Remove column migration
+rails generate clickhouse:migration RemoveEmailFromUsers
+```
+
+The generator automatically detects migration type from the name:
+- `Create*` → `create_table`
+- `Add*To*` → `add_column`
+- `Remove*From*` → `remove_column`
+- Other names → `change_table`
+
+### Manual Migrations
+
+You can also create migrations manually:
+
 ```ruby
 class CreateEvents < ActiveRecord::Migration[7.1]
   def change
@@ -82,6 +159,8 @@ class CreateEvents < ActiveRecord::Migration[7.1]
   end
 end
 ```
+
+See [docs/ACTIVE_RECORD_SCHEMA.md](ACTIVE_RECORD_SCHEMA.md) for detailed migration patterns and options.
 
 ## Type Mapping
 

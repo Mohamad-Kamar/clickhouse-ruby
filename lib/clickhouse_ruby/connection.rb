@@ -353,8 +353,20 @@ module ClickhouseRuby
       yield
     rescue *NETWORK_ERRORS => e
       @connected = false
-      handler = NETWORK_ERROR_MAPPING[e.class]
-      raise handler.call(e, self)
+      handler = NETWORK_ERROR_MAPPING[e.class] || find_handler_for(e)
+      raise handler.call(e, self) if handler
+      raise e  # Re-raise if no handler found (shouldn't happen, but be safe)
+    end
+
+    # Finds error handler by checking exception class and its ancestors
+    #
+    # @param exception [Exception] the exception to find a handler for
+    # @return [Proc, nil] the handler lambda or nil if not found
+    private def find_handler_for(exception)
+      exception.class.ancestors.each do |ancestor_class|
+        return NETWORK_ERROR_MAPPING[ancestor_class] if NETWORK_ERROR_MAPPING.key?(ancestor_class)
+      end
+      nil
     end
 
     # Sets up request body with optional compression

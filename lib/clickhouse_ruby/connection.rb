@@ -32,6 +32,44 @@ module ClickhouseRuby
   #   )
   #
   class Connection
+    # Error mapping for network issues to ClickhouseRuby exceptions
+    # Each entry maps an exception class to a lambda that creates the appropriate error
+    NETWORK_ERROR_MAPPING = {
+      OpenSSL::SSL::SSLError => lambda { |e, _conn|
+        SSLError.new("SSL connection failed: #{e.message}", original_error: e)
+      },
+      Errno::ECONNREFUSED => lambda { |e, conn|
+        ConnectionNotEstablished.new("Connection refused to #{conn.host}:#{conn.port}: #{e.message}", original_error: e)
+      },
+      Errno::EHOSTUNREACH => lambda { |e, conn|
+        ConnectionNotEstablished.new("Host unreachable #{conn.host}:#{conn.port}: #{e.message}", original_error: e)
+      },
+      SocketError => lambda { |e, conn|
+        ConnectionNotEstablished.new("Socket error to #{conn.host}:#{conn.port}: #{e.message}", original_error: e)
+      },
+      Net::OpenTimeout => lambda { |e, conn|
+        ConnectionTimeout.new("Connection timeout to #{conn.host}:#{conn.port}", original_error: e)
+      },
+      Net::ReadTimeout => lambda { |e, _conn|
+        ConnectionTimeout.new("Read timeout: #{e.message}", original_error: e)
+      },
+      Net::WriteTimeout => lambda { |e, _conn|
+        ConnectionTimeout.new("Write timeout: #{e.message}", original_error: e)
+      },
+      Errno::ECONNRESET => lambda { |e, _conn|
+        ConnectionError.new("Connection reset: #{e.message}", original_error: e)
+      },
+      Errno::EPIPE => lambda { |e, _conn|
+        ConnectionError.new("Broken pipe: #{e.message}", original_error: e)
+      },
+      IOError => lambda { |e, _conn|
+        ConnectionError.new("IO error: #{e.message}", original_error: e)
+      },
+    }.freeze
+
+    # All exception classes that should be caught and mapped
+    NETWORK_ERRORS = NETWORK_ERROR_MAPPING.keys.freeze
+
     # @return [String] the ClickHouse host
     attr_reader :host
 
@@ -113,29 +151,11 @@ module ClickhouseRuby
       @mutex.synchronize do
         return self if @connected && @http&.started?
 
-        begin
+        with_error_handling do
           @http = build_http
           @http.start
           @connected = true
           @last_used_at = Time.now
-        rescue OpenSSL::SSL::SSLError => e
-          @connected = false
-          raise SSLError.new(
-            "SSL connection failed: #{e.message}",
-            original_error: e,
-          )
-        rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH, SocketError => e
-          @connected = false
-          raise ConnectionNotEstablished.new(
-            "Failed to connect to #{@host}:#{@port}: #{e.message}",
-            original_error: e,
-          )
-        rescue Net::OpenTimeout => e
-          @connected = false
-          raise ConnectionTimeout.new(
-            "Connection timeout to #{@host}:#{@port}",
-            original_error: e,
-          )
         end
       end
 
@@ -313,34 +333,28 @@ module ClickhouseRuby
     # @return [Net::HTTPResponse]
     def execute_request(request)
       @mutex.synchronize do
-        response = @http.request(request)
-        @last_used_at = Time.now
-        response
-      rescue Net::ReadTimeout => e
-        @connected = false
-        raise ConnectionTimeout.new(
-          "Read timeout: #{e.message}",
-          original_error: e,
-        )
-      rescue Net::WriteTimeout => e
-        @connected = false
-        raise ConnectionTimeout.new(
-          "Write timeout: #{e.message}",
-          original_error: e,
-        )
-      rescue Errno::ECONNRESET, Errno::EPIPE, IOError => e
-        @connected = false
-        raise ConnectionError.new(
-          "Connection lost: #{e.message}",
-          original_error: e,
-        )
-      rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH, SocketError => e
-        @connected = false
-        raise ConnectionNotEstablished.new(
-          "Connection failed: #{e.message}",
-          original_error: e,
-        )
+        with_error_handling do
+          response = @http.request(request)
+          @last_used_at = Time.now
+          response
+        end
       end
+    end
+
+    # Executes a block with network error handling
+    #
+    # Maps network exceptions to ClickhouseRuby exceptions and marks
+    # connection as disconnected on error.
+    #
+    # @yield the block to execute
+    # @return the block's return value
+    # @raise [ConnectionError, ConnectionTimeout, ConnectionNotEstablished, SSLError]
+    def with_error_handling
+      yield
+    rescue *NETWORK_ERRORS => e
+      @connected = false
+      handler = NETWORK_ERROR_MAPPING[e.class]
+      raise handler.call(e, self)
     end
 
     # Sets up request body with optional compression

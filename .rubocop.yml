@@ -107,9 +107,6 @@ RSpec/DescribeClass:
 RSpec/FilePath:
   Enabled: false
 
-RSpec/SpecFilePathFormat:
-  Enabled: false
-
 RSpec/MultipleMemoizedHelpers:
   Max: 10
 

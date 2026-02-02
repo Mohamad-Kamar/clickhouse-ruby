@@ -59,15 +59,36 @@ module ClickhouseRuby
     # @return [Hash] default ClickHouse settings for all queries
     attr_accessor :default_settings
 
+    # @return [String, nil] compression algorithm ('gzip' or nil to disable)
+    attr_accessor :compression
+
+    # @return [Integer] minimum body size in bytes to compress (default: 1024)
+    attr_accessor :compression_threshold
+
+    # @return [Integer] maximum number of retry attempts (default: 3)
+    attr_accessor :max_retries
+
+    # @return [Float] initial backoff delay in seconds (default: 1.0)
+    attr_accessor :initial_backoff
+
+    # @return [Float] maximum backoff delay in seconds (default: 120.0)
+    attr_accessor :max_backoff
+
+    # @return [Float] exponential backoff multiplier (default: 1.6)
+    attr_accessor :backoff_multiplier
+
+    # @return [Symbol] jitter strategy: :full, :equal, or :none (default: :equal)
+    attr_accessor :retry_jitter
+
     # Creates a new Configuration with sensible defaults
     def initialize
-      @host = 'localhost'
+      @host = "localhost"
       @port = 8123
-      @database = 'default'
+      @database = "default"
       @username = nil
       @password = nil
       @ssl = false
-      @ssl_verify = true  # SECURITY: Verify certificates by default
+      @ssl_verify = true # SECURITY: Verify certificates by default
       @ssl_ca_path = nil
       @connect_timeout = 10
       @read_timeout = 60
@@ -77,13 +98,20 @@ module ClickhouseRuby
       @logger = nil
       @log_level = :info
       @default_settings = {}
+      @compression = nil
+      @compression_threshold = 1024
+      @max_retries = 3
+      @initial_backoff = 1.0
+      @max_backoff = 120.0
+      @backoff_multiplier = 1.6
+      @retry_jitter = :equal
     end
 
     # Returns the base URL for HTTP connections
     #
     # @return [String] the base URL
     def base_url
-      scheme = ssl ? 'https' : 'http'
+      scheme = ssl ? "https" : "http"
       "#{scheme}://#{host}:#{port}"
     end
 
@@ -96,6 +124,13 @@ module ClickhouseRuby
 
       # Auto-enable SSL for secure ports
       [8443, 443].include?(port)
+    end
+
+    # Returns whether compression is enabled
+    #
+    # @return [Boolean] true if compression is set to 'gzip'
+    def compression_enabled?
+      @compression == "gzip"
     end
 
     # Returns a hash suitable for creating HTTP connections
@@ -113,7 +148,9 @@ module ClickhouseRuby
         ssl_ca_path: ssl_ca_path,
         connect_timeout: connect_timeout,
         read_timeout: read_timeout,
-        write_timeout: write_timeout
+        write_timeout: write_timeout,
+        compression: compression,
+        compression_threshold: compression_threshold,
       }
     end
 
@@ -124,7 +161,11 @@ module ClickhouseRuby
       new_config = Configuration.new
       instance_variables.each do |var|
         value = instance_variable_get(var)
-        new_config.instance_variable_set(var, value.dup) rescue value
+        begin
+          new_config.instance_variable_set(var, value.dup)
+        rescue StandardError
+          value
+        end
       end
       new_config
     end
@@ -134,10 +175,10 @@ module ClickhouseRuby
     # @raise [ConfigurationError] if the configuration is invalid
     # @return [Boolean] true if valid
     def validate!
-      raise ConfigurationError, 'host is required' if host.nil? || host.empty?
-      raise ConfigurationError, 'port must be a positive integer' unless port.is_a?(Integer) && port.positive?
-      raise ConfigurationError, 'database is required' if database.nil? || database.empty?
-      raise ConfigurationError, 'pool_size must be at least 1' unless pool_size >= 1
+      raise ConfigurationError, "host is required" if host.nil? || host.empty?
+      raise ConfigurationError, "port must be a positive integer" unless port.is_a?(Integer) && port.positive?
+      raise ConfigurationError, "database is required" if database.nil? || database.empty?
+      raise ConfigurationError, "pool_size must be at least 1" unless pool_size >= 1
 
       true
     end

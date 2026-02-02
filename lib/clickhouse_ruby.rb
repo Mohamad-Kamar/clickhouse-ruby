@@ -1,13 +1,15 @@
 # frozen_string_literal: true
 
-require_relative 'clickhouse_ruby/version'
-require_relative 'clickhouse_ruby/errors'
-require_relative 'clickhouse_ruby/configuration'
-require_relative 'clickhouse_ruby/types'
-require_relative 'clickhouse_ruby/result'
-require_relative 'clickhouse_ruby/client'
-require_relative 'clickhouse_ruby/connection'
-require_relative 'clickhouse_ruby/connection_pool'
+require_relative "clickhouse_ruby/version"
+require_relative "clickhouse_ruby/errors"
+require_relative "clickhouse_ruby/configuration"
+require_relative "clickhouse_ruby/types"
+require_relative "clickhouse_ruby/result"
+require_relative "clickhouse_ruby/retry_handler"
+require_relative "clickhouse_ruby/streaming_result"
+require_relative "clickhouse_ruby/client"
+require_relative "clickhouse_ruby/connection"
+require_relative "clickhouse_ruby/connection_pool"
 
 # ClickhouseRuby - Ruby/ActiveRecord integration for ClickHouse
 #
@@ -96,6 +98,4 @@ module ClickhouseRuby
 end
 
 # Load ActiveRecord integration if ActiveRecord is available
-if defined?(ActiveRecord)
-  require_relative 'clickhouse_ruby/active_record'
-end
+require_relative "clickhouse_ruby/active_record" if defined?(ActiveRecord)

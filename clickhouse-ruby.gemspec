@@ -37,8 +37,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "webmock", "~> 3.18.0"  # Ruby 2.6 compatible
   spec.add_development_dependency "yard", "~> 0.9"
 
-  # Optional: uncomment for linting (requires Ruby 2.7+)
-  # spec.add_development_dependency "rubocop", "~> 1.60"
-  # spec.add_development_dependency "rubocop-rspec", "~> 2.26"
-  # spec.add_development_dependency "vcr", "~> 6.2"
+  # Linting (requires Ruby 2.7+, but we'll use 1.47 for Ruby 2.6 compatibility)
+  spec.add_development_dependency "rubocop", "~> 1.47"
+  spec.add_development_dependency "rubocop-rspec", "~> 2.20"
 end

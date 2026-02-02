@@ -57,16 +57,12 @@ module ClickhouseRuby
     def initialize(columns:, types:, data:, statistics: {}, deserialize: true)
       @columns = columns.freeze
       @types = types.freeze
-      @elapsed_time = statistics['elapsed']
-      @rows_read = statistics['rows_read']
-      @bytes_read = statistics['bytes_read']
+      @elapsed_time = statistics["elapsed"]
+      @rows_read = statistics["rows_read"]
+      @bytes_read = statistics["bytes_read"]
 
       # Build type instances for deserialization
-      @type_instances = if deserialize
-                          types.map { |t| Types.lookup(t) }
-                        else
-                          nil
-                        end
+      @type_instances = (types.map { |t| Types.lookup(t) } if deserialize)
 
       # Convert raw data to row hashes
       @rows = build_rows(data).freeze
@@ -149,11 +145,11 @@ module ClickhouseRuby
     # @param response_data [Hash] parsed JSON response
     # @return [Result] the result
     def self.from_json_compact(response_data)
-      meta = response_data['meta'] || []
-      columns = meta.map { |m| m['name'] }
-      types = meta.map { |m| m['type'] }
-      data = response_data['data'] || []
-      statistics = response_data['statistics'] || {}
+      meta = response_data["meta"] || []
+      columns = meta.map { |m| m["name"] }
+      types = meta.map { |m| m["type"] }
+      data = response_data["data"] || []
+      statistics = response_data["statistics"] || {}
 
       new(columns: columns, types: types, data: data, statistics: statistics)
     end
@@ -177,9 +173,7 @@ module ClickhouseRuby
         @columns.each_with_index do |col, i|
           value = row_values[i]
           # Deserialize if we have type instances
-          if @type_instances
-            value = @type_instances[i].deserialize(value)
-          end
+          value = @type_instances[i].deserialize(value) if @type_instances
           row[col] = value
         end
         row

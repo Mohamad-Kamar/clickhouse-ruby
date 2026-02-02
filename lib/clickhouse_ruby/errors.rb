@@ -62,7 +62,7 @@ module ClickhouseRuby
       parts << "Code: #{code}" if code
       parts << "HTTP Status: #{http_status}" if http_status
       parts << "SQL: #{sql}" if sql
-      parts.join(' | ')
+      parts.join(" | ")
     end
   end
 
@@ -147,10 +147,10 @@ module ClickhouseRuby
     # @param config [Configuration, nil] the configuration containing credentials
     # @return [String] the sanitized message
     def sanitize_message(message, config)
-      return message unless config&.respond_to?(:password) && config.password
+      return message unless config.respond_to?(:password) && config&.password
       return message if config.password.to_s.empty?
 
-      message.gsub(config.password.to_s, '[REDACTED]')
+      message.gsub(config.password.to_s, "[REDACTED]")
     end
   end
 end

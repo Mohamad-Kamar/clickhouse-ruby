@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require 'thread'
-require 'timeout'
+require "timeout"
 
 module ClickhouseRuby
   # Thread-safe connection pool for managing multiple ClickHouse connections
@@ -46,7 +45,7 @@ module ClickhouseRuby
       @connection_options = config.to_connection_options
 
       # Pool state
-      @available = []           # Connections available for checkout
+      @available = [] # Connections available for checkout
       @in_use = []             # Connections currently checked out
       @all_connections = []    # All connections ever created
 
@@ -110,10 +109,8 @@ module ClickhouseRuby
           remaining = deadline - Time.now
           if remaining <= 0
             @total_timeouts += 1
-            raise PoolTimeout.new(
-              "Could not obtain a connection from the pool within #{@timeout} seconds " \
-              "(pool size: #{@size}, in use: #{@in_use.size})"
-            )
+            raise PoolTimeout, "Could not obtain a connection from the pool within #{@timeout} seconds " \
+                               "(pool size: #{@size}, in use: #{@in_use.size})"
           end
 
           @condition.wait(@mutex, remaining)
@@ -236,7 +233,7 @@ module ClickhouseRuby
           total: @all_connections.size,
           capacity: @size,
           healthy: healthy,
-          unhealthy: unhealthy
+          unhealthy: unhealthy,
         }
       end
     end
@@ -253,7 +250,7 @@ module ClickhouseRuby
           total_connections: @all_connections.size,
           total_checkouts: @total_checkouts,
           total_timeouts: @total_timeouts,
-          uptime_seconds: Time.now - @created_at
+          uptime_seconds: Time.now - @created_at,
         }
       end
     end
@@ -275,13 +272,12 @@ module ClickhouseRuby
     def get_available_connection
       while (conn = @available.pop)
         # Verify the connection is still healthy
-        if conn.healthy? && !conn.stale?
-          return conn
-        else
-          # Remove unhealthy connections
-          safe_disconnect(conn)
-          @all_connections.delete(conn)
-        end
+        return conn if conn.healthy? && !conn.stale?
+
+        # Remove unhealthy connections
+        safe_disconnect(conn)
+        @all_connections.delete(conn)
+
       end
 
       nil

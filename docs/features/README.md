@@ -1,281 +1,180 @@
-# Phase 2 Features: Complete Research Documentation
+# ClickhouseRuby v0.2.0 Features Guide
 
-This directory contains comprehensive research and Ralph loop implementation specs for ClickhouseRuby v0.2.0 features.
+This guide documents the 9 new features added in v0.2.0, organized by category with usage examples and best practices.
 
-## Quick Start
+## Overview
 
-Each feature file is **self-contained** and can be implemented independently. Start with any feature by:
+### Type System Enhancements
 
-1. Open the feature file (e.g., `enum_type.md`)
-2. Follow the **Ralph Loop Checklist** section
-3. Run proof commands to verify each checkbox
-4. All checkboxes pass = feature complete
+**[Enum Type](./enum_type.md)** - Fixed set of predefined string values
+- `Enum8('active'=1, 'inactive'=2)` support
+- Automatic string-to-integer mapping
+- Use when columns have known fixed values (status, category, etc.)
 
-## Implementation Order
+**[Decimal Type](./decimal_type.md)** - Arbitrary precision financial math
+- `Decimal(precision, scale)` support via BigDecimal
+- Use for financial data (prices, balances, rates)
+- Avoids floating-point rounding errors
 
-### Batch 1: Types (Standalone, ~1-2 days each)
-Start here - no dependencies on other features:
-- [`enum_type.md`](./enum_type.md) - Enum8/Enum16 support
-- [`decimal_type.md`](./decimal_type.md) - Decimal(P,S) support
+### Client Enhancements
 
-### Batch 2: Client Enhancements (~2-3 days each)
-Core reliability and performance improvements:
-- [`http_compression.md`](./http_compression.md) - gzip compression
-- [`retry_logic.md`](./retry_logic.md) - Exponential backoff
-- [`streaming.md`](./streaming.md) - Memory-efficient results
-
-### Batch 3: ActiveRecord Query Extensions (~1-2 days each)
-Most-requested query features:
-- [`prewhere.md`](./prewhere.md) - PREWHERE clause (query optimization)
-- [`final.md`](./final.md) - FINAL modifier (deduplication)
-- [`sample.md`](./sample.md) - SAMPLE clause (approximate queries)
-- [`settings_dsl.md`](./settings_dsl.md) - Per-query SETTINGS
-
-## File Sizes & Content
-
-| Feature | Size | Type | Complexity |
-|---------|------|------|------------|
-| enum_type | 9.8KB | Type | Medium |
-| decimal_type | 11.8KB | Type | Medium |
-| http_compression | 12.5KB | Client | Low |
-| retry_logic | 14.2KB | Client | High |
-| streaming | 14.6KB | Client | High |
-| prewhere | 13.4KB | ActiveRecord | Medium |
-| final | 12.7KB | ActiveRecord | Low |
-| sample | 14.3KB | ActiveRecord | Medium |
-| settings_dsl | 14.2KB | ActiveRecord | Low |
-
-**Total:** ~117KB of research and implementation guidance
-
-## What Each File Contains
-
-### 1. Research Summary
-- Deep research findings with sources
-- ClickHouse engine details
-- Comparison with Go/Python implementations
-- SQL syntax variations
-
-### 2. Gotchas & Edge Cases
-- Common mistakes when implementing
-- Error conditions to handle
-- Performance pitfalls
-- Interaction with other features
-
-### 3. Best Practices
-- When to use the feature
-- Common patterns from industry
-- Configuration recommendations
-- Performance optimization tips
-
-### 4. Implementation Details
-- Exact file locations
-- Code patterns and templates
-- Class structure recommendations
-- Integration points with existing code
-
-### 5. Ralph Loop Checklist
-- 8-12 testable outcomes per feature
-- Proof commands for verification
-- Exact `bundle exec rspec` commands
-- Integration test requirements
-
-### 6. Test Scenarios
-- Unit test examples
-- Integration test examples
-- Parametric test patterns
-- Edge case coverage
-
-## Ralph Loop Methodology
-
-Each feature follows this pattern:
-
-```
-┌─────────────────────────────────────────┐
-│ 1. Read feature file (Guardrails)       │
-├─────────────────────────────────────────┤
-│ 2. Understand research & gotchas         │
-├─────────────────────────────────────────┤
-│ 3. Run Ralph Loop (iterate):            │
-│   a) Implement code                     │
-│   b) Run proof command                  │
-│   c) Mark checkbox ✓                    │
-│   d) Next checkbox                      │
-├─────────────────────────────────────────┤
-│ 4. All checkboxes ✓ → Feature complete  │
-└─────────────────────────────────────────┘
-```
-
-### Proof Commands Pattern
-
-Every checkbox has a `**prove:**` command that:
-- Runs a specific test or command
-- Returns **pass/fail** (binary outcome)
-- No manual judgment needed
-- Examples:
-  ```bash
-  bundle exec rspec spec/unit/clickhouse_ruby/types/enum_spec.rb --example "parses"
-  bundle exec rake spec_unit
-  bundle exec rake rubocop
-  ```
-
-## Implementation Guidelines
-
-### 1. Test-First Approach
-- Create spec files first (tests are in the docs)
-- Implement minimum code to pass tests
-- Run proof command to verify
-
-### 2. Isolated Features
-- Each feature is independent
-- Can be implemented in any order
-- No cross-feature dependencies in Batch 1 & 2
-- Batch 3 features share `RelationExtensions` module
-
-### 3. No Over-Engineering
-- Implement exactly what's specified
-- Don't add extra features
-- Don't "improve" existing code
-- Follow existing patterns
-
-### 4. Documentation Quality
-- Each feature doc is complete
-- No "research further" sections
-- Gotchas are explicitly listed
-- Best practices are clear
-
-## Common Patterns Across Features
-
-### Type Features (Enum, Decimal)
+**[HTTP Compression](./http_compression.md)** - Automatic gzip compression
 ```ruby
-# Pattern location: lib/clickhouse_ruby/types/your_type.rb
-class YourType < Base
-  def cast(value)       # Ruby → ClickHouse
-  def deserialize(val)  # Response → Ruby
-  def serialize(val)    # Ruby → SQL literal
-  def nullable?         # Boolean
-  def to_s              # Type string
+ClickhouseRuby.configure do |config|
+  config.compression = 'gzip'
+  config.compression_threshold = 1024  # Only compress payloads > 1KB
 end
-
-# Register in lib/clickhouse_ruby/types/registry.rb
-register('YourType', YourType)
 ```
+- Reduces network bandwidth for large payloads
+- Zero-dependency implementation (uses built-in Zlib)
 
-### Client Features (Compression, Retry, Streaming)
+**[Retry Logic](./retry_logic.md)** - Automatic retries with exponential backoff
 ```ruby
-# Modifications to:
-# - lib/clickhouse_ruby/configuration.rb (add options)
-# - lib/clickhouse_ruby/connection.rb (implement)
-# - lib/clickhouse_ruby/client.rb (expose methods)
-
-# Pattern: Minimal changes, maximum leverage of existing code
-```
-
-### ActiveRecord Features (PREWHERE, FINAL, SAMPLE, SETTINGS)
-```ruby
-# All share RelationExtensions module at:
-# lib/clickhouse_ruby/active_record/relation_extensions.rb
-
-# Pattern:
-def method_name(opts = :chain)
-  if opts == :chain
-    MethodNameChain.new(spawn)
-  else
-    spawn.method_name!(opts)
-  end
+ClickhouseRuby.configure do |config|
+  config.max_retries = 3
+  config.initial_backoff = 1.0
+  config.backoff_multiplier = 1.6
+  config.max_backoff = 120
 end
+```
+- Auto-retries on connection errors and HTTP 5xx/429
+- Does NOT retry on query syntax errors
+- Configurable jitter strategies
 
-# Chain into Arel visitor for SQL generation
+**[Result Streaming](./streaming.md)** - Memory-efficient large result processing
+```ruby
+client.stream_execute('SELECT * FROM huge_table') do |row|
+  process_row(row)
+end
+```
+- Constant memory usage regardless of result size
+- Yields rows one at a time
+- Perfect for data processing pipelines
+
+### ActiveRecord Query Extensions
+
+**[PREWHERE Clause](./prewhere.md)** - Query optimization by pre-filtering
+```ruby
+# Filters before reading all columns
+Event.prewhere(date: Date.today).where(status: 'active')
+# SELECT * FROM events PREWHERE date = '2024-02-02' WHERE status = 'active'
 ```
 
-## Verification Checklist
+**[FINAL Modifier](./final.md)** - Deduplication for ReplacingMergeTree
+```ruby
+# Returns deduplicated results
+User.final.where(id: 123)
+# SELECT * FROM users FINAL WHERE id = 123
+```
+- Use for accuracy when you need latest version of each row
+- Performance cost: 2-10x slower (merges at query time)
 
-Before moving to next feature:
-- [ ] All checkboxes marked ✓
-- [ ] `bundle exec rake spec_unit` passes
-- [ ] `bundle exec rake rubocop` passes (no lint errors)
-- [ ] Integration test passes (if applicable)
-- [ ] No existing tests broken
+**[SAMPLE Clause](./sample.md)** - Approximate queries on large tables
+```ruby
+# 10% sample of data
+Event.sample(0.1).count
+# SELECT count() FROM events SAMPLE 0.1
 
-## Performance Expectations
+# At least 10,000 rows
+Event.sample(10000).average(:amount)
+# SELECT avg(amount) FROM events SAMPLE 10000
+```
 
-| Feature | Impl Time | Test Coverage | Priority |
-|---------|-----------|---------------|----------|
-| Enum | 2-3 hrs | 90%+ | High |
-| Decimal | 2-3 hrs | 90%+ | High |
-| Compression | 3-4 hrs | 85%+ | Medium |
-| Retry | 4-5 hrs | 90%+ | High |
-| Streaming | 4-5 hrs | 85%+ | Medium |
-| PREWHERE | 3-4 hrs | 85%+ | High |
-| FINAL | 1-2 hrs | 80%+ | Medium |
-| SAMPLE | 2-3 hrs | 80%+ | Medium |
-| SETTINGS | 2-3 hrs | 80%+ | Low |
+**[SETTINGS DSL](./settings_dsl.md)** - Per-query ClickHouse configuration
+```ruby
+# Increase parallelism for this query
+Event.settings(max_threads: 4).where(active: true).count
+# SELECT count() FROM events WHERE active = 1 SETTINGS max_threads = 4
+```
 
-**Total Estimate:** 24-32 implementation hours
+## Feature Categories
 
-## Getting Unstuck
+### Type System (lib/clickhouse_ruby/types/)
+- `Enum` - Enum8/Enum16 with bidirectional mapping
+- `Decimal` - Precision arithmetic with automatic variant selection
 
-### Issue: Test fails, but implementation looks correct
+### Client (lib/clickhouse_ruby/client.rb)
+- `stream_execute` - Memory-efficient result streaming
+- Configuration for compression, retry, timeout options
 
-1. **Check the proof command:** Exact test name match?
-2. **Re-read Gotchas section:** Any edge cases missed?
-3. **Look at test scenario:** Example tests in feature doc
-4. **Compare with similar code:** Look at existing types or methods
+### ActiveRecord (lib/clickhouse_ruby/active_record/relation_extensions.rb)
+- `.final` - Deduplication modifier
+- `.sample(fraction or count)` - Approximate queries
+- `.prewhere(conditions)` - Pre-filter optimization
+- `.settings(options)` - Per-query configuration
 
-### Issue: SQL generation wrong
+## Quick Reference
 
-1. **Print the SQL:** Add debug output to see generated SQL
-2. **Compare with Research Summary:** Examples show expected SQL
-3. **Check clause ordering:** SQL order matters for ClickHouse
-4. **Verify Arel visitor:** Method override correct?
+| Feature | Use Case | Performance | Complexity |
+|---------|----------|-------------|-----------|
+| Enum | Fixed values (status, type) | No impact | Low |
+| Decimal | Financial data | No impact | Low |
+| Compression | Large payloads | Reduces bandwidth | Low |
+| Retry | Network resilience | Adds latency on retry | Low |
+| Streaming | Large results | Constant memory | Medium |
+| PREWHERE | Query optimization | Faster queries | Low |
+| FINAL | Accuracy | 2-10x slower | Low |
+| SAMPLE | Approximate analysis | Much faster | Medium |
+| SETTINGS | Query tuning | Varies | Low |
 
-### Issue: Integration test fails
+## Common Gotchas
 
-1. **Check table engine:** Some features only work on MergeTree
-2. **Verify test setup:** ClickHouse running? Table created?
-3. **Check ClickHouse version:** Some features new in recent versions
-4. **Review error message:** ClickHouse errors are detailed
+### Enum Type
+- Values must be predefined in table schema
+- Cannot insert unknown values
+- Ordering is numeric (1, 2, 3), not alphabetical
 
-## References & Resources
+### Decimal Type
+- Use `BigDecimal` in Ruby, NOT `Float`
+- Scale cannot exceed precision
+- Decimal32 max 9 digits, Decimal64 max 18 digits
 
-### ClickHouse Documentation
-- [ClickHouse SQL Reference](https://clickhouse.com/docs/en/sql-reference/)
-- [Data Types](https://clickhouse.com/docs/en/sql-reference/data-types/)
-- [Query Optimization](https://clickhouse.com/docs/en/sql-reference/statements/select/prewhere)
+### HTTP Compression
+- Overhead for small payloads (<1MB)
+- Set `compression_threshold` appropriately
 
-### Ruby/Rails Resources
-- [ActiveRecord Query Interface](https://guides.rubyonrails.org/active_record_querying.html)
-- [Arel Library](https://github.com/rails/arel)
-- [RSpec Testing](https://rspec.info/)
+### Retry Logic
+- INSERT operations not idempotent by default
+- Use `query_id` for safe retries on inserts
+- Does NOT retry on QueryError (syntax errors)
 
-### ClickhouseRuby Project
-- Architecture: See [/docs/MVP.md](../MVP.md)
-- Existing patterns: Look at [lib/clickhouse_ruby/types/](../../lib/clickhouse_ruby/types/)
-- Test patterns: See [spec/unit/](../../spec/unit/)
+### Streaming
+- Cannot use with FINAL
+- Cannot use with aggregate functions
+- SELECT * works, SELECT col1, col2 also works
 
-## Next Steps
+### PREWHERE
+- Doesn't work with multiple JOINs
+- Requires MergeTree family tables
+- Auto-optimization often better than manual use
 
-1. **Choose first feature** from Batch 1 (Enum or Decimal)
-2. **Open the feature file** (e.g., `enum_type.md`)
-3. **Read Guardrails section** (understand constraints)
-4. **Read Research Summary** (understand what you're building)
-5. **Create test file** (from Test Scenarios section)
-6. **Implement code** (from Implementation Details section)
-7. **Run Ralph Loop** (iterate through checklist)
-8. **Move to next feature** (when all ✓)
+### FINAL
+- High performance cost
+- Use for correctness, not speed
+- Requires specific table engines (ReplacingMergeTree, etc.)
 
-## Questions?
+### SAMPLE
+- Requires `SAMPLE BY` clause on table creation
+- Results are approximate (not exact)
+- Counts need adjustment or use `_sample_factor`
 
-Refer to the specific feature file's:
-- Research Summary → "What is this feature?"
-- Gotchas & Edge Cases → "What could go wrong?"
-- Best Practices → "How should I use this?"
-- Implementation Details → "How do I code it?"
-- Test Scenarios → "How do I test it?"
+### SETTINGS
+- Must be at END of query
+- Unknown settings cause ClickHouse errors
+- Boolean values are 0/1, not true/false
 
-Each feature is designed to be **completely self-contained** with all information needed for implementation.
+## Documentation Files
+
+- **Individual feature docs** - Detailed research, gotchas, best practices, and implementation details
+- **This README** - Quick reference and overview
+- **Main README** - General library usage and setup
+
+## See Also
+
+- [ActiveRecord Integration](../ACTIVE_RECORD.md) - Schema creation, mutations, type mapping
+- [Architecture](../ARCHITECTURE.md) - Design overview and component details
+- [Main README](../../README.md) - Installation, basic usage, error handling
 
 ---
 
-**Status:** All 9 features researched and documented. Ready for implementation.
-
-Start with [`enum_type.md`](./enum_type.md)!
+**All features are production-ready and fully tested.** See individual feature docs for detailed usage patterns.

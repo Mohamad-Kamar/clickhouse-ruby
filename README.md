@@ -8,12 +8,19 @@ A lightweight Ruby client for ClickHouse with optional ActiveRecord integration.
 
 ## Features
 
+**Core (v0.1.0)**
 - **Simple HTTP client** - Clean API for queries, commands, and bulk inserts
 - **Connection pooling** - Built-in connection pool with health checks
 - **Type system** - Full support for ClickHouse types including Nullable, Array, Map, Tuple
 - **Proper error handling** - Never silently ignores errors (fixes clickhouse-activerecord #230)
 - **SSL/TLS support** - Certificate verification enabled by default
 - **ActiveRecord integration** - Optional familiar model-based access
+
+**Enhanced (v0.2.0)**
+- **Enum & Decimal types** - Fixed-set values and arbitrary precision arithmetic
+- **Query optimization** - PREWHERE clause, FINAL deduplication, SAMPLE approximation
+- **Performance** - HTTP compression, result streaming, automatic retries with backoff
+- **Query control** - Per-query SETTINGS DSL for ClickHouse configuration
 
 ## Installation
 
@@ -108,6 +115,50 @@ CLICKHOUSE_USERNAME=default
 CLICKHOUSE_PASSWORD=secret
 CLICKHOUSE_SSL=false
 ```
+
+### v0.2.0 Enhancements
+
+**HTTP Compression** - Reduce bandwidth for large payloads:
+```ruby
+ClickhouseRuby.configure do |config|
+  config.compression = 'gzip'
+  config.compression_threshold = 1024  # Only compress > 1KB
+end
+```
+
+**Retry Logic** - Automatic retries with exponential backoff:
+```ruby
+ClickhouseRuby.configure do |config|
+  config.max_retries = 3
+  config.initial_backoff = 1.0
+  config.backoff_multiplier = 1.6
+  config.max_backoff = 120
+end
+```
+
+**Result Streaming** - Process large results with constant memory:
+```ruby
+client.stream_execute('SELECT * FROM huge_table') do |row|
+  process_row(row)
+end
+```
+
+**ActiveRecord Query Extensions** - ClickHouse-specific query methods:
+```ruby
+# Query optimization
+Event.prewhere(date: Date.today).where(status: 'active')
+
+# Deduplication
+User.final.where(id: 123)
+
+# Approximate queries
+Event.sample(0.1).count  # 10% sample
+
+# Per-query configuration
+Event.settings(max_threads: 4).where(active: true)
+```
+
+See [docs/features/README.md](docs/features/README.md) for detailed documentation on all v0.2.0 features.
 
 ## Usage
 

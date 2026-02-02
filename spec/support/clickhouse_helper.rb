@@ -8,7 +8,7 @@
 # - Truncating tables between tests
 #
 module ClickhouseHelper
-  TEST_DATABASE = 'clickhouse_ruby_test'
+  TEST_DATABASE = "clickhouse_ruby_test"
 
   class << self
     # Returns a configured client for testing
@@ -17,12 +17,12 @@ module ClickhouseHelper
     def client
       @client ||= begin
         ClickhouseRuby.configure do |config|
-          config.host = ENV.fetch('CLICKHOUSE_HOST', 'localhost')
-          config.port = ENV.fetch('CLICKHOUSE_PORT', 8123).to_i
+          config.host = ENV.fetch("CLICKHOUSE_HOST", "localhost")
+          config.port = ENV.fetch("CLICKHOUSE_PORT", 8123).to_i
           config.database = TEST_DATABASE
-          config.username = ENV.fetch('CLICKHOUSE_USER', 'default')
-          config.password = ENV.fetch('CLICKHOUSE_PASSWORD', nil)
-          config.ssl = ENV.fetch('CLICKHOUSE_SSL', 'false') == 'true'
+          config.username = ENV.fetch("CLICKHOUSE_USER", "default")
+          config.password = ENV.fetch("CLICKHOUSE_PASSWORD", nil)
+          config.ssl = ENV.fetch("CLICKHOUSE_SSL", "false") == "true"
           config.connect_timeout = 5
           config.read_timeout = 30
         end
@@ -53,7 +53,7 @@ module ClickhouseHelper
     def teardown_test_database
       puts "Tearing down test database: #{TEST_DATABASE}"
 
-      if ENV['CLICKHOUSE_DROP_TEST_DB'] == 'true'
+      if ENV["CLICKHOUSE_DROP_TEST_DB"] == "true"
         system_client = create_system_client
         system_client.execute("DROP DATABASE IF EXISTS #{TEST_DATABASE}")
       else
@@ -80,7 +80,7 @@ module ClickhouseHelper
     # @param schema [String] column definitions
     # @param engine [String] table engine (default: MergeTree)
     # @param order_by [String] ORDER BY clause
-    def create_table(name, schema, engine: 'MergeTree', order_by: 'tuple()')
+    def create_table(name, schema, engine: "MergeTree", order_by: "tuple()")
       client.execute(<<~SQL)
         CREATE TABLE IF NOT EXISTS #{name} (
           #{schema}
@@ -109,18 +109,18 @@ module ClickhouseHelper
     # Creates a client connected to the system database
     def create_system_client
       config = ClickhouseRuby::Configuration.new
-      config.host = ENV.fetch('CLICKHOUSE_HOST', 'localhost')
-      config.port = ENV.fetch('CLICKHOUSE_PORT', 8123).to_i
-      config.database = 'system'
-      config.username = ENV.fetch('CLICKHOUSE_USER', 'default')
-      config.password = ENV.fetch('CLICKHOUSE_PASSWORD', nil)
-      config.ssl = ENV.fetch('CLICKHOUSE_SSL', 'false') == 'true'
+      config.host = ENV.fetch("CLICKHOUSE_HOST", "localhost")
+      config.port = ENV.fetch("CLICKHOUSE_PORT", 8123).to_i
+      config.database = "system"
+      config.username = ENV.fetch("CLICKHOUSE_USER", "default")
+      config.password = ENV.fetch("CLICKHOUSE_PASSWORD", nil)
+      config.ssl = ENV.fetch("CLICKHOUSE_SSL", "false") == "true"
       ClickhouseRuby::Client.new(config)
     end
 
     # Standard test tables used across integration tests
     TEST_TABLES = {
-      'test_integers' => {
+      "test_integers" => {
         schema: <<~SQL,
           id UInt64,
           int8_col Int8,
@@ -132,27 +132,27 @@ module ClickhouseHelper
           uint32_col UInt32,
           uint64_col UInt64
         SQL
-        order_by: 'id'
+        order_by: "id",
       },
-      'test_strings' => {
+      "test_strings" => {
         schema: <<~SQL,
           id UInt64,
           name String,
           fixed_name FixedString(10),
           nullable_name Nullable(String)
         SQL
-        order_by: 'id'
+        order_by: "id",
       },
-      'test_arrays' => {
+      "test_arrays" => {
         schema: <<~SQL,
           id UInt64,
           int_array Array(Int32),
           string_array Array(String),
           nested_array Array(Array(Int32))
         SQL
-        order_by: 'id'
+        order_by: "id",
       },
-      'test_complex' => {
+      "test_complex" => {
         schema: <<~SQL,
           id UInt64,
           tuple_col Tuple(String, UInt64),
@@ -160,9 +160,9 @@ module ClickhouseHelper
           nullable_int Nullable(Int32),
           array_tuple Array(Tuple(String, UInt64))
         SQL
-        order_by: 'id'
+        order_by: "id",
       },
-      'test_events' => {
+      "test_events" => {
         schema: <<~SQL,
           id UInt64,
           event_type String,
@@ -171,8 +171,8 @@ module ClickhouseHelper
           metadata Map(String, String),
           created_at DateTime DEFAULT now()
         SQL
-        order_by: '(event_type, timestamp)'
-      }
+        order_by: "(event_type, timestamp)",
+      },
     }.freeze
 
     def create_test_tables
@@ -190,23 +190,23 @@ module ClickhouseHelper
 end
 
 # RSpec shared context for integration tests
-RSpec.shared_context 'integration test', integration: true do
+RSpec.shared_context "integration test", integration: true do
   let(:client) { ClickhouseHelper.client }
 
-  before(:each) do
+  before do
     ClickhouseHelper.truncate_tables
   end
 end
 
 # Shared examples for error handling
-RSpec.shared_examples 'raises on query error' do |error_class|
+RSpec.shared_examples "raises on query error" do |error_class|
   it "raises #{error_class}" do
     expect { subject }.to raise_error(error_class)
   end
 end
 
-RSpec.shared_examples 'does not silently fail' do
-  it 'raises an exception instead of returning silently' do
+RSpec.shared_examples "does not silently fail" do
+  it "raises an exception instead of returning silently" do
     expect { subject }.to raise_error(ClickhouseRuby::Error)
   end
 end

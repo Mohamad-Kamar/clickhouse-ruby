@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require 'json'
-require 'uri'
-require 'bigdecimal'
+require "json"
+require "uri"
+require "bigdecimal"
 
 module ClickhouseRuby
   # Main HTTP client for ClickHouse communication
@@ -40,16 +40,19 @@ module ClickhouseRuby
   #
   class Client
     # Default response format for queries
-    DEFAULT_FORMAT = 'JSONCompact'
+    DEFAULT_FORMAT = "JSONCompact"
 
     # Format for bulk inserts (5x faster than VALUES)
-    INSERT_FORMAT = 'JSONEachRow'
+    INSERT_FORMAT = "JSONEachRow"
 
     # @return [Configuration] the client configuration
     attr_reader :config
 
     # @return [ConnectionPool] the connection pool
     attr_reader :pool
+
+    # @return [RetryHandler] the retry handler
+    attr_reader :retry_handler
 
     # Creates a new Client
     #
@@ -61,6 +64,13 @@ module ClickhouseRuby
       @pool = ConnectionPool.new(config)
       @logger = config.logger
       @default_settings = config.default_settings || {}
+      @retry_handler = RetryHandler.new(
+        max_attempts: config.max_retries,
+        initial_backoff: config.initial_backoff,
+        max_backoff: config.max_backoff,
+        multiplier: config.backoff_multiplier,
+        jitter: config.retry_jitter,
+      )
     end
 
     # Executes a SQL query and returns results
@@ -82,17 +92,9 @@ module ClickhouseRuby
     #     settings: { max_rows_to_read: 1_000_000 }
     #   )
     def execute(sql, settings: {}, format: DEFAULT_FORMAT)
-      # Build the query with format
-      query_with_format = "#{sql.strip} FORMAT #{format}"
-
-      # Build query parameters
-      params = build_query_params(settings)
-
-      # Execute via connection pool
-      response = execute_request(query_with_format, params)
-
-      # Parse response based on format
-      parse_response(response, sql, format)
+      @retry_handler.with_retry(idempotent: true) do
+        execute_internal(sql, settings: settings, format: format)
+      end
     end
 
     # Executes a command (INSERT, CREATE, DROP, etc.) that doesn't return data
@@ -137,13 +139,152 @@ module ClickhouseRuby
     #     { id: 1, name: 'click', extra: 'ignored' },
     #   ], columns: ['id', 'name'])
     def insert(table, rows, columns: nil, settings: {}, format: :json_each_row)
-      raise ArgumentError, 'rows cannot be empty' if rows.nil? || rows.empty?
+      raise ArgumentError, "rows cannot be empty" if rows.nil? || rows.empty?
 
+      @retry_handler.with_retry(idempotent: false) do |query_id|
+        settings_with_id = settings.merge(query_id: query_id)
+        insert_internal(table, rows, columns: columns, settings: settings_with_id, format: format)
+      end
+    end
+
+    # Checks if the ClickHouse server is reachable
+    #
+    # @return [Boolean] true if server responds to ping
+    def ping
+      @pool.with_connection(&:ping)
+    rescue ClickhouseRuby::ConnectionError, ClickhouseRuby::ConnectionTimeout,
+           ClickhouseRuby::PoolTimeout, SystemCallError, SocketError,
+           Net::OpenTimeout, Net::ReadTimeout
+      false
+    end
+
+    # Returns the ClickHouse server version
+    #
+    # @return [String] version string
+    # @raise [QueryError] if query fails
+    def server_version
+      result = execute("SELECT version() AS version")
+      result.first["version"]
+    end
+
+    # Closes all connections in the pool
+    #
+    # Call this when shutting down to clean up resources.
+    #
+    # @return [void]
+    def close
+      @pool.shutdown
+    end
+    alias disconnect close
+
+    # Returns pool statistics
+    #
+    # @return [Hash] pool stats
+    def pool_stats
+      @pool.stats
+    end
+
+    # Returns a streaming result for memory-efficient processing
+    #
+    # Useful for queries that return large result sets. Results are parsed
+    # line-by-line as they arrive from the server, keeping memory usage constant.
+    #
+    # @param sql [String] the SQL query to execute
+    # @param settings [Hash] ClickHouse settings for this query
+    # @return [StreamingResult] the streaming result
+    #
+    # @example
+    #   result = client.stream_execute('SELECT * FROM huge_table')
+    #   result.each { |row| process(row) }
+    #
+    # @example Lazy enumeration
+    #   client.stream_execute('SELECT * FROM huge_table')
+    #     .lazy
+    #     .select { |row| row['active'] == 1 }
+    #     .take(100)
+    #     .to_a
+    def stream_execute(sql, settings: {})
+      # Create dedicated connection (not from pool)
+      connection = Connection.new(@config.to_connection_options)
+
+      StreamingResult.new(
+        connection,
+        sql,
+        compression: @config.compression,
+      )
+    end
+
+    # Convenience method for iterating over rows one at a time
+    #
+    # Equivalent to stream_execute(sql).each(&block)
+    #
+    # @param sql [String] the SQL query to execute
+    # @param settings [Hash] ClickHouse settings
+    # @yield [Hash] each row
+    # @return [Enumerator] if no block given, otherwise nil
+    #
+    # @example
+    #   client.each_row('SELECT * FROM events') do |row|
+    #     process(row)
+    #   end
+    def each_row(sql, settings: {}, &block)
+      stream_execute(sql, settings: settings).each(&block)
+    end
+
+    # Convenience method for batch processing
+    #
+    # Equivalent to stream_execute(sql).each_batch(size: batch_size, &block)
+    #
+    # @param sql [String] the SQL query to execute
+    # @param batch_size [Integer] number of rows per batch
+    # @param settings [Hash] ClickHouse settings
+    # @yield [Array<Hash>] each batch of rows
+    # @return [Enumerator] if no block given, otherwise nil
+    #
+    # @example
+    #   client.each_batch('SELECT * FROM events', batch_size: 500) do |batch|
+    #     insert_into_cache(batch)
+    #   end
+    def each_batch(sql, batch_size: 1000, settings: {}, &block)
+      stream_execute(sql, settings: settings).each_batch(size: batch_size, &block)
+    end
+
+    private
+
+    # Internal execute without retry wrapper
+    #
+    # @param sql [String] the SQL query to execute
+    # @param settings [Hash] ClickHouse settings for this query
+    # @param format [String] response format (default: JSONCompact)
+    # @return [Result] query results
+    def execute_internal(sql, settings: {}, format: DEFAULT_FORMAT)
+      # Build the query with format
+      query_with_format = "#{sql.strip} FORMAT #{format}"
+
+      # Build query parameters
+      params = build_query_params(settings)
+
+      # Execute via connection pool
+      response = execute_request(query_with_format, params)
+
+      # Parse response based on format
+      parse_response(response, sql, format)
+    end
+
+    # Internal insert without retry wrapper
+    #
+    # @param table [String] the table name
+    # @param rows [Array<Hash>] array of row hashes
+    # @param columns [Array<String>, nil] column names
+    # @param settings [Hash] ClickHouse settings (may include query_id)
+    # @param format [Symbol] insert format
+    # @return [Boolean] true if successful
+    def insert_internal(table, rows, columns: nil, settings: {}, format: :json_each_row)
       # Determine columns from first row if not specified
       columns ||= rows.first.keys.map(&:to_s)
 
       # Build INSERT statement
-      columns_str = columns.map { |c| quote_identifier(c) }.join(', ')
+      columns_str = columns.map { |c| quote_identifier(c) }.join(", ")
       sql = "INSERT INTO #{quote_identifier(table)} (#{columns_str}) FORMAT #{INSERT_FORMAT}"
 
       # Build JSON body
@@ -165,8 +306,8 @@ module ClickhouseRuby
         log_query(sql) if @logger
 
         response = conn.post("#{path}&query=#{URI.encode_www_form_component(sql)}", body, {
-          'Content-Type' => 'application/json'
-        })
+          "Content-Type" => "application/json",
+        },)
 
         handle_response(response, sql)
       end
@@ -174,53 +315,17 @@ module ClickhouseRuby
       true
     end
 
-    # Checks if the ClickHouse server is reachable
-    #
-    # @return [Boolean] true if server responds to ping
-    def ping
-      @pool.with_connection(&:ping)
-    rescue ClickhouseRuby::ConnectionError, ClickhouseRuby::ConnectionTimeout,
-           ClickhouseRuby::PoolTimeout, SystemCallError, SocketError,
-           Net::OpenTimeout, Net::ReadTimeout
-      false
-    end
-
-    # Returns the ClickHouse server version
-    #
-    # @return [String] version string
-    # @raise [QueryError] if query fails
-    def server_version
-      result = execute('SELECT version() AS version')
-      result.first['version']
-    end
-
-    # Closes all connections in the pool
-    #
-    # Call this when shutting down to clean up resources.
-    #
-    # @return [void]
-    def close
-      @pool.shutdown
-    end
-    alias disconnect close
-
-    # Returns pool statistics
-    #
-    # @return [Hash] pool stats
-    def pool_stats
-      @pool.stats
-    end
-
-    private
-
     # Builds query parameters including database and settings
     #
     # @param settings [Hash] query-specific settings
     # @return [Hash] all query parameters
     def build_query_params(settings = {})
       params = {
-        'database' => @config.database
+        "database" => @config.database,
       }
+
+      # Add compression parameter if enabled
+      params["enable_http_compression"] = "1" if @config.compression_enabled?
 
       # Merge default settings and query-specific settings
       all_settings = @default_settings.merge(settings)
@@ -236,7 +341,7 @@ module ClickhouseRuby
     # @param params [Hash] query parameters
     # @return [String] the path with query string
     def build_path(params)
-      query_string = params.map { |k, v| "#{k}=#{URI.encode_www_form_component(v)}" }.join('&')
+      query_string = params.map { |k, v| "#{k}=#{URI.encode_www_form_component(v)}" }.join("&")
       "/?#{query_string}"
     end
 
@@ -270,9 +375,9 @@ module ClickhouseRuby
     # @raise [QueryError] if response indicates an error
     def handle_response(response, sql)
       # CRITICAL: Check status FIRST - never silently ignore errors
-      unless response.code == '200'
-        raise_clickhouse_error(response, sql)
-      end
+      return if response.code == "200"
+
+      raise_clickhouse_error(response, sql)
 
       # Response is successful - caller can now safely parse body
     end
@@ -286,7 +391,7 @@ module ClickhouseRuby
     # @param sql [String] the SQL that failed
     # @raise [QueryError] always raises
     def raise_clickhouse_error(response, sql)
-      body = response.body || ''
+      body = response.body || ""
       code = extract_error_code(body)
       message = extract_error_message(body)
 
@@ -299,7 +404,7 @@ module ClickhouseRuby
         message,
         code: code,
         http_status: response.code,
-        sql: truncate_sql(sql)
+        sql: truncate_sql(sql),
       )
     end
 
@@ -322,9 +427,9 @@ module ClickhouseRuby
       # ClickHouse error format: "Code: 60. DB::Exception: Table ... doesn't exist."
       # Try to extract just the meaningful part
       if body =~ /DB::Exception:\s*(.+?)(?:\s*\(version|$)/m
-        $1.strip
+        ::Regexp.last_match(1).strip
       else
-        body.strip.empty? ? 'Unknown ClickHouse error' : body.strip
+        body.strip.empty? ? "Unknown ClickHouse error" : body.strip
       end
     end
 
@@ -341,13 +446,13 @@ module ClickhouseRuby
       return Result.empty if body.nil? || body.strip.empty?
 
       case format
-      when 'JSONCompact'
+      when "JSONCompact"
         parse_json_compact(body, sql)
-      when 'JSON'
+      when "JSON"
         parse_json(body, sql)
       else
         # For unknown formats, return raw body wrapped in result
-        Result.new(columns: ['result'], types: ['String'], data: [[body]])
+        Result.new(columns: ["result"], types: ["String"], data: [[body]])
       end
     end
 
@@ -369,10 +474,10 @@ module ClickhouseRuby
     def parse_json(body, sql)
       data = parse_json_body(body, sql)
 
-      meta = data['meta'] || []
-      columns = meta.map { |m| m['name'] }
-      types = meta.map { |m| m['type'] }
-      rows = data['data'] || []
+      meta = data["meta"] || []
+      columns = meta.map { |m| m["name"] }
+      types = meta.map { |m| m["type"] }
+      rows = data["data"] || []
 
       # JSON format returns rows as objects, convert to arrays
       row_arrays = rows.map { |row| columns.map { |col| row[col] } }
@@ -381,7 +486,7 @@ module ClickhouseRuby
         columns: columns,
         types: types,
         data: row_arrays,
-        statistics: data['statistics'] || {}
+        statistics: data["statistics"] || {},
       )
     end
 
@@ -397,7 +502,7 @@ module ClickhouseRuby
       raise QueryError.new(
         "Failed to parse ClickHouse response: #{e.message}",
         sql: truncate_sql(sql),
-        original_error: e
+        original_error: e,
       )
     end
 
@@ -407,7 +512,7 @@ module ClickhouseRuby
     # @return [String] quoted identifier
     def quote_identifier(identifier)
       # ClickHouse uses backticks for identifiers
-      "`#{identifier.to_s.gsub('`', '``')}`"
+      "`#{identifier.to_s.gsub("`", "``")}`"
     end
 
     # Serializes a Ruby value for JSON insertion
@@ -418,9 +523,9 @@ module ClickhouseRuby
       case value
       when Time, DateTime
         # ClickHouse expects ISO8601 format for DateTime
-        value.strftime('%Y-%m-%d %H:%M:%S')
+        value.strftime("%Y-%m-%d %H:%M:%S")
       when Date
-        value.strftime('%Y-%m-%d')
+        value.strftime("%Y-%m-%d")
       when BigDecimal
         value.to_f
       when Symbol
@@ -466,7 +571,7 @@ module ClickhouseRuby
 
       @logger.error(
         "[ClickhouseRuby] ClickHouse error: #{message} " \
-        "(code: #{code || 'unknown'}, http: #{http_status}, sql: #{truncate_sql(sql, 200)})"
+        "(code: #{code || "unknown"}, http: #{http_status}, sql: #{truncate_sql(sql, 200)})",
       )
     end
   end

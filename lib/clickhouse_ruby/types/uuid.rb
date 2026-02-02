@@ -8,17 +8,19 @@ module ClickhouseRuby
     # in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
     #
     class UUID < Base
+      include NullSafe
+
       # UUID regex pattern
       UUID_PATTERN = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
 
+      protected
+
       # Converts a Ruby value to a UUID string
       #
-      # @param value [Object] the value to convert
-      # @return [String, nil] the UUID string
+      # @param value [Object] the value to convert (guaranteed non-nil)
+      # @return [String] the UUID string
       # @raise [TypeCastError] if the value is not a valid UUID
-      def cast(value)
-        return nil if value.nil?
-
+      def cast_value(value)
         str = normalize_uuid(value)
         validate_uuid!(str, value)
         str
@@ -26,21 +28,17 @@ module ClickhouseRuby
 
       # Converts a value from ClickHouse to a UUID string
       #
-      # @param value [Object] the value from ClickHouse
-      # @return [String, nil] the UUID string
-      def deserialize(value)
-        return nil if value.nil?
-
+      # @param value [Object] the value from ClickHouse (guaranteed non-nil)
+      # @return [String] the UUID string
+      def deserialize_value(value)
         normalize_uuid(value)
       end
 
       # Converts a UUID to SQL literal
       #
-      # @param value [String, nil] the UUID value
+      # @param value [String] the UUID value (guaranteed non-nil)
       # @return [String] the SQL literal
-      def serialize(value)
-        return "NULL" if value.nil?
-
+      def serialize_value(value)
         "'#{normalize_uuid(value)}'"
       end
 
@@ -72,12 +70,7 @@ module ClickhouseRuby
       def validate_uuid!(str, original)
         return if str.match?(UUID_PATTERN)
 
-        raise TypeCastError.new(
-          "Invalid UUID format: '#{original}'",
-          from_type: original.class.name,
-          to_type: name,
-          value: original,
-        )
+        raise_format_error(original, "UUID")
       end
     end
   end
